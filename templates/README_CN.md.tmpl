@@ -1,4 +1,4 @@
-# Claude-to-IM Skill
+# {{HOST_DISPLAY}}-to-IM Skill
 
 将当前安装的 AI 编程宿主桥接到 IM 平台 —— 在 Telegram、Discord 或飞书中与 AI 编程代理对话。
 
@@ -33,9 +33,7 @@
 
 ## 前置要求
 
-- **Node.js >= 20**
-- **Claude Code CLI** — 已安装并完成认证（`claude` 命令可用）
-- **可选的 Codex CLI**（仅当你计划使用 `CTI_RUNTIME=codex` 或 `auto` 时）— `npm install -g @openai/codex`
+{{PREREQUISITES_ZH}}
 
 ## 安装
 
@@ -48,7 +46,7 @@ npx skills add op7418/Claude-to-IM-skill
 ### Git 克隆
 
 ```bash
-git clone https://github.com/op7418/Claude-to-IM-skill.git ~/.claude/skills/claude-to-im
+git clone https://github.com/op7418/Claude-to-IM-skill.git {{HOST_SKILLS_DIR}}/{{SKILL_COMMAND}}
 ```
 
 将仓库直接克隆到所选宿主的 Skills 目录。
@@ -59,16 +57,16 @@ git clone https://github.com/op7418/Claude-to-IM-skill.git ~/.claude/skills/clau
 
 ```bash
 git clone https://github.com/op7418/Claude-to-IM-skill.git ~/code/Claude-to-IM-skill
-mkdir -p ~/.claude/skills
-ln -s ~/code/Claude-to-IM-skill ~/.claude/skills/claude-to-im
+mkdir -p {{HOST_SKILLS_DIR}}
+ln -s ~/code/Claude-to-IM-skill {{HOST_SKILLS_DIR}}/{{SKILL_COMMAND}}
 ```
 
-### Claude
+### {{HOST_DISPLAY}}
 
-如果你使用 Claude Code，直接克隆到 Claude skills 目录：
+{{INSTALL_LEAD_ZH}}
 
 ```bash
-git clone https://github.com/op7418/Claude-to-IM-skill.git ~/.claude/skills/claude-to-im
+git clone https://github.com/op7418/Claude-to-IM-skill.git {{HOST_SKILLS_DIR}}/{{SKILL_COMMAND}}
 ```
 
 或使用提供的安装脚本，自动安装依赖并构建：
@@ -76,10 +74,10 @@ git clone https://github.com/op7418/Claude-to-IM-skill.git ~/.claude/skills/clau
 ```bash
 # 克隆并安装（复制模式）
 git clone https://github.com/op7418/Claude-to-IM-skill.git ~/code/Claude-to-IM-skill
-bash ~/code/Claude-to-IM-skill/scripts/install-claude.sh
+bash ~/code/Claude-to-IM-skill/scripts/install-{{HOST}}.sh
 
 # 或使用符号链接模式（方便开发）
-bash ~/code/Claude-to-IM-skill/scripts/install-claude.sh --link
+bash ~/code/Claude-to-IM-skill/scripts/install-{{HOST}}.sh --link
 ```
 
 ### 多宿主安装
@@ -100,14 +98,14 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 
 ### 验证安装
 
-**Claude：** 启动新会话，输入 `/` 应能看到 `claude-to-im`。
+{{VERIFY_INSTALLATION_ZH}}
 
 ## 快速开始
 
 ### 1. 配置
 
 ```
-/claude-to-im setup
+/{{SKILL_COMMAND}} setup
 ```
 
 向导会引导你完成以下步骤：
@@ -120,7 +118,7 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 ### 2. 启动
 
 ```
-/claude-to-im start
+/{{SKILL_COMMAND}} start
 ```
 
 守护进程在后台启动。关闭终端后仍会继续运行。
@@ -137,14 +135,14 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 
 | 支持斜杠命令的宿主 | 支持自然语言的宿主 | 说明 |
 |---|---|---|
-| `/claude-to-im setup` | "claude-to-im setup" / "配置" | 交互式配置向导 |
-| `/claude-to-im start` | "start bridge" / "启动桥接" | 启动桥接守护进程 |
-| `/claude-to-im stop` | "stop bridge" / "停止桥接" | 停止守护进程 |
-| `/claude-to-im status` | "bridge status" / "状态" | 查看运行状态 |
-| `/claude-to-im logs` | "查看日志" | 查看最近 50 行日志 |
-| `/claude-to-im logs 200` | "logs 200" | 查看最近 200 行日志 |
-| `/claude-to-im reconfigure` | "reconfigure" / "修改配置" | 交互式修改配置 |
-| `/claude-to-im doctor` | "doctor" / "诊断" | 诊断问题 |
+| `/{{SKILL_COMMAND}} setup` | "{{SKILL_COMMAND}} setup" / "配置" | 交互式配置向导 |
+| `/{{SKILL_COMMAND}} start` | "start bridge" / "启动桥接" | 启动桥接守护进程 |
+| `/{{SKILL_COMMAND}} stop` | "stop bridge" / "停止桥接" | 停止守护进程 |
+| `/{{SKILL_COMMAND}} status` | "bridge status" / "状态" | 查看运行状态 |
+| `/{{SKILL_COMMAND}} logs` | "查看日志" | 查看最近 50 行日志 |
+| `/{{SKILL_COMMAND}} logs 200` | "logs 200" | 查看最近 200 行日志 |
+| `/{{SKILL_COMMAND}} reconfigure` | "reconfigure" / "修改配置" | 交互式修改配置 |
+| `/{{SKILL_COMMAND}} doctor` | "doctor" / "诊断" | 诊断问题 |
 
 ## 平台配置指南
 
@@ -223,7 +221,7 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 运行诊断：
 
 ```
-/claude-to-im doctor
+/{{SKILL_COMMAND}} doctor
 ```
 
 检查项目：Node.js 版本、配置文件是否存在及权限、token 有效性（实时 API 调用）、日志目录、PID 文件一致性、最近的错误。
@@ -239,7 +237,7 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 
 ## 安全
 
-- 所有凭据存储在 `~/.claude-to-im/config.env`，权限 `chmod 600`
+- 所有凭据存储在 `~/.{{SKILL_COMMAND}}/config.env`，权限 `chmod 600`
 - 日志输出中 token 自动脱敏（基于正则匹配）
 - 允许用户/频道/服务器列表限制谁可以与机器人交互
 - 守护进程是本地进程，没有入站网络监听
