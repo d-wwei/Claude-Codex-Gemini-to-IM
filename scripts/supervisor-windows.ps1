@@ -135,6 +135,12 @@ function Install-WinSWService {
     $nodePath = Get-NodePath
     $xmlPath = Join-Path $SkillDir "$ServiceName.xml"
 
+    # Run as current user so the service can access ~/.claude-to-im and Codex login state
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    Write-Host "Service will run as: $currentUser"
+    $cred = Get-Credential -UserName $currentUser -Message "Enter password for '$currentUser' (required for Windows Service logon)"
+    $plainPwd = $cred.GetNetworkCredential().Password
+
     # Generate WinSW config XML
     @"
 <service>
@@ -144,6 +150,16 @@ function Install-WinSWService {
   <executable>$nodePath</executable>
   <arguments>$DaemonMjs</arguments>
   <workingdirectory>$SkillDir</workingdirectory>
+  <serviceaccount>
+    <username>$currentUser</username>
+    <password>$([System.Security.SecurityElement]::Escape($plainPwd))</password>
+    <allowservicelogon>true</allowservicelogon>
+  </serviceaccount>
+  <env name="USERPROFILE" value="$env:USERPROFILE"/>
+  <env name="APPDATA" value="$env:APPDATA"/>
+  <env name="LOCALAPPDATA" value="$env:LOCALAPPDATA"/>
+  <env name="PATH" value="$env:PATH"/>
+  <env name="CTI_HOME" value="$CtiHome"/>
   <logpath>$(Join-Path $CtiHome 'logs')</logpath>
   <log mode="append">
     <logfile>bridge-service.log</logfile>
@@ -160,6 +176,7 @@ function Install-WinSWService {
 
     & $winswCopy install
     Write-Host "Service '$ServiceName' installed via WinSW."
+    Write-Host "  Service account: $currentUser"
     Write-Host "Start with:  & `"$winswCopy`" start"
     Write-Host "Or:          sc.exe start $ServiceName"
 }
@@ -168,16 +185,25 @@ function Install-NSSMService {
     param([string]$NSSMPath)
     $nodePath = Get-NodePath
 
+    # Run as current user so the service can access ~/.claude-to-im and Codex login state
+    $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    Write-Host "Service will run as: $currentUser"
+    $cred = Get-Credential -UserName $currentUser -Message "Enter password for '$currentUser' (required for Windows Service logon)"
+    $plainPwd = $cred.GetNetworkCredential().Password
+
     & $NSSMPath install $ServiceName $nodePath $DaemonMjs
     & $NSSMPath set $ServiceName AppDirectory $SkillDir
+    & $NSSMPath set $ServiceName ObjectName $currentUser $plainPwd
     & $NSSMPath set $ServiceName AppStdout $LogFile
     & $NSSMPath set $ServiceName AppStderr $LogFile
     & $NSSMPath set $ServiceName AppStdoutCreationDisposition 4
     & $NSSMPath set $ServiceName AppStderrCreationDisposition 4
     & $NSSMPath set $ServiceName Description "Claude-to-IM bridge daemon"
     & $NSSMPath set $ServiceName AppRestartDelay 10000
+    & $NSSMPath set $ServiceName AppEnvironmentExtra "USERPROFILE=$env:USERPROFILE" "APPDATA=$env:APPDATA" "LOCALAPPDATA=$env:LOCALAPPDATA" "CTI_HOME=$CtiHome"
 
     Write-Host "Service '$ServiceName' installed via NSSM."
+    Write-Host "  Service account: $currentUser"
     Write-Host "Start with:  nssm start $ServiceName"
     Write-Host "Or:          sc.exe start $ServiceName"
 }

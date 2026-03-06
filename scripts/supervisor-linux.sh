@@ -41,3 +41,9 @@ supervisor_status_extra() {
   # No extra status for Linux fallback
   :
 }
+
+supervisor_is_running() {
+  local pid
+  pid=$(read_pid)
+  pid_alive "$pid"
+}

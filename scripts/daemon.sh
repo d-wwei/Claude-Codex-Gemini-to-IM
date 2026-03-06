@@ -98,13 +98,22 @@ show_failure_help() {
 
 # ── Load platform-specific supervisor ──
 
-if [ "$(uname -s)" = "Darwin" ]; then
-  # shellcheck source=supervisor-macos.sh
-  source "$SKILL_DIR/scripts/supervisor-macos.sh"
-else
-  # shellcheck source=supervisor-linux.sh
-  source "$SKILL_DIR/scripts/supervisor-linux.sh"
-fi
+case "$(uname -s)" in
+  Darwin)
+    # shellcheck source=supervisor-macos.sh
+    source "$SKILL_DIR/scripts/supervisor-macos.sh"
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    # Windows detected via Git Bash / MSYS2 / Cygwin — delegate to PowerShell
+    echo "Windows detected. Delegating to supervisor-windows.ps1..."
+    powershell.exe -ExecutionPolicy Bypass -File "$SKILL_DIR/scripts/supervisor-windows.ps1" "$@"
+    exit $?
+    ;;
+  *)
+    # shellcheck source=supervisor-linux.sh
+    source "$SKILL_DIR/scripts/supervisor-linux.sh"
+    ;;
+esac
 
 # ── Commands ──
 
@@ -113,10 +122,10 @@ case "${1:-help}" in
     ensure_dirs
     ensure_built
 
-    # Check if already running
-    EXISTING_PID=$(read_pid)
-    if pid_alive "$EXISTING_PID"; then
-      echo "Bridge already running (PID: $EXISTING_PID)"
+    # Check if already running (supervisor-aware: launchctl on macOS, PID on Linux)
+    if supervisor_is_running; then
+      EXISTING_PID=$(read_pid)
+      echo "Bridge already running${EXISTING_PID:+ (PID: $EXISTING_PID)}"
       cat "$STATUS_FILE" 2>/dev/null
       exit 1
     fi
@@ -165,14 +174,14 @@ case "${1:-help}" in
     ;;
 
   status)
-    PID=$(read_pid)
-
-    # Platform-specific status info
+    # Platform-specific status info (prints launchd/service state)
     supervisor_status_extra
 
-    if pid_alive "$PID"; then
-      echo "Bridge process is running (PID: $PID)"
-      # Business status
+    # Process status: supervisor-aware (launchctl on macOS, PID on Linux)
+    if supervisor_is_running; then
+      PID=$(read_pid)
+      echo "Bridge process is running${PID:+ (PID: $PID)}"
+      # Business status from status.json
       if status_running; then
         echo "Bridge status: running"
       else

@@ -91,7 +91,13 @@ generate_plist() {
     <false/>
 
     <key>KeepAlive</key>
-    <false/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
 
     <key>EnvironmentVariables</key>
     <dict>
@@ -122,5 +128,27 @@ supervisor_is_managed() {
 supervisor_status_extra() {
   if supervisor_is_managed; then
     echo "Bridge is registered with launchd ($LAUNCHD_LABEL)"
+    # Extract PID from launchctl as the authoritative source
+    local lc_pid
+    lc_pid=$(launchctl print "gui/$(id -u)/$LAUNCHD_LABEL" 2>/dev/null | grep -m1 'pid = ' | sed 's/.*pid = //' | tr -d ' ')
+    if [ -n "$lc_pid" ] && [ "$lc_pid" != "0" ] && [ "$lc_pid" != "-" ]; then
+      echo "launchd reports PID: $lc_pid"
+    fi
   fi
+}
+
+# Override: on macOS, check launchctl first, then fall back to PID file
+supervisor_is_running() {
+  # Primary: launchctl knows the process
+  if supervisor_is_managed; then
+    local lc_pid
+    lc_pid=$(launchctl print "gui/$(id -u)/$LAUNCHD_LABEL" 2>/dev/null | grep -m1 'pid = ' | sed 's/.*pid = //' | tr -d ' ')
+    if [ -n "$lc_pid" ] && [ "$lc_pid" != "0" ] && [ "$lc_pid" != "-" ]; then
+      return 0
+    fi
+  fi
+  # Fallback: PID file
+  local pid
+  pid=$(read_pid)
+  pid_alive "$pid"
 }
