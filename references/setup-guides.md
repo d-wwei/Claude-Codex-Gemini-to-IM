@@ -68,13 +68,15 @@ Leave empty to allow anyone who can message the bot.
 
 Token format: a long base64-like string (e.g. `MTIzNDU2Nzg5.Gxxxxx.xxxxxxxxxxxxxxxxxxxxxxxx`)
 
-### Allowed User IDs (optional)
+### Allowed User IDs
 
 **How to find Discord User IDs:**
 1. In Discord, go to Settings → Advanced → enable **Developer Mode**
 2. Right-click on any user → **"Copy User ID"**
 
-Enter comma-separated IDs. Leave empty to allow anyone in the server.
+Enter comma-separated IDs.
+
+**Why this matters:** The bot uses a default-deny policy. If neither Allowed User IDs nor Allowed Channel IDs are configured, the bot will silently reject all incoming messages. You must set at least one.
 
 ### Allowed Channel IDs (optional)
 

@@ -133,16 +133,28 @@ case "${1:-help}" in
     clean_env
     echo "Starting bridge..."
     supervisor_start
-    sleep 2
 
-    # Verify: read PID written by main.ts, check process + status.json
-    NEW_PID=$(read_pid)
-    if pid_alive "$NEW_PID" && status_running; then
-      echo "Bridge started (PID: $NEW_PID)"
+    # Poll for up to 10 seconds waiting for status.json to report running
+    STARTED=false
+    for _ in $(seq 1 10); do
+      sleep 1
+      if status_running; then
+        STARTED=true
+        break
+      fi
+      # If supervisor process already died, stop waiting
+      if ! supervisor_is_running; then
+        break
+      fi
+    done
+
+    if [ "$STARTED" = "true" ]; then
+      NEW_PID=$(read_pid)
+      echo "Bridge started${NEW_PID:+ (PID: $NEW_PID)}"
       cat "$STATUS_FILE" 2>/dev/null
     else
       echo "Failed to start bridge."
-      pid_alive "$NEW_PID" || echo "  Process not running."
+      supervisor_is_running || echo "  Process not running."
       status_running || echo "  status.json not reporting running=true."
       show_last_exit_reason
       show_failure_help
