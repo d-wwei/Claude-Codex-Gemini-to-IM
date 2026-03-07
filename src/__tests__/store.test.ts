@@ -17,7 +17,7 @@ function makeSettings(): Map<string, string> {
   ]);
 }
 
-describe('JsonFileStore', () => {
+describe('JsonFileStore', { concurrency: false }, () => {
   beforeEach(() => {
     // Clean data dir before each test for isolation
     fs.rmSync(DATA_DIR, { recursive: true, force: true });
@@ -45,6 +45,22 @@ describe('JsonFileStore', () => {
   it('getSession returns null for unknown id', () => {
     const store = new JsonFileStore(makeSettings());
     assert.equal(store.getSession('nonexistent'), null);
+  });
+
+  it('stores session metadata and exposes session records', () => {
+    const store = new JsonFileStore(makeSettings());
+    const session = store.createSession('Weekly Report', 'model-1', undefined, '/tmp');
+    store.setSessionName(session.id, '周报整理');
+    store.archiveSession(session.id, '目标: 周报\n近况: 已完成初稿');
+
+    const meta = store.getSessionMeta(session.id);
+    assert.equal(meta?.name, '周报整理');
+    assert.equal(meta?.archived, true);
+    assert.match(meta?.archive_summary || '', /已完成初稿/);
+
+    const records = store.listSessionRecords();
+    assert.equal(records.length, 1);
+    assert.equal(records[0].meta.name, '周报整理');
   });
 
   it('upsertChannelBinding creates and updates', () => {
@@ -276,6 +292,16 @@ describe('JsonFileStore', () => {
     store.updateSessionModel(session.id, 'model-new');
     const updated = store.getSession(session.id);
     assert.equal(updated?.model, 'model-new');
+  });
+
+  it('touchSession updates last-active metadata and channel linkage', () => {
+    const store = new JsonFileStore(makeSettings());
+    const session = store.createSession('test', 'model', undefined, '/tmp');
+    store.touchSession(session.id, { channelType: 'feishu', chatId: 'oc_123' });
+    const meta = store.getSessionMeta(session.id);
+    assert.equal(meta?.last_channel_type, 'feishu');
+    assert.equal(meta?.last_chat_id, 'oc_123');
+    assert.ok(meta?.last_active_at);
   });
 
   // ── Provider (no-op) ──

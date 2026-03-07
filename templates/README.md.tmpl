@@ -144,6 +144,17 @@ All commands are run inside your installed host:
 | `/{{SKILL_COMMAND}} reconfigure` | "reconfigure" / "修改配置" | Update config interactively |
 | `/{{SKILL_COMMAND}} doctor` | "doctor" / "诊断" | Diagnose issues |
 
+The bridge also supports built-in session management commands inside IM chats:
+
+| IM command | Description |
+|---|---|
+| `/lsessions` | List active bridge sessions with name, short ID, channel, status, last activity, and summary |
+| `/lsessions --all` | Include archived sessions in the list |
+| `/switchto &lt;session_id\|name&gt;` | Switch the current chat to an existing session by ID or assigned name |
+| `/rename &lt;new_name&gt;` | Rename the current session |
+| `/archive [session_id\|name]` | Archive the current or specified session and keep a short summary |
+| `/unarchive &lt;session_id\|name&gt;` | Restore an archived session |
+
 ## Platform Setup Guides
 
 The `setup` wizard provides inline guidance for every step. Here's a summary:

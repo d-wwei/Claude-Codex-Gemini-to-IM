@@ -52,6 +52,24 @@ Each install renders host-specific docs and commands into its own skill director
 - Troubleshooting reference: [references/troubleshooting.md](references/troubleshooting.md)
 - Security model: [SECURITY.md](SECURITY.md)
 
+## Built-in Session Management Commands
+
+The bridge now includes cross-host session management commands at the bridge layer. They work the same way for Claude, Codex, and Gemini variants because they are handled before a message is forwarded to the underlying agent.
+
+| Command | Effect |
+|---|---|
+| `/lsessions` | List active bridge sessions with name, short ID, channel, status, last activity, and summary |
+| `/lsessions --all` | Include archived sessions in the list |
+| `/switchto <session_id\|name>` | Switch the current IM chat to an existing session by ID or assigned name |
+| `/rename <new_name>` | Rename the current session |
+| `/archive [session_id\|name]` | Archive the current or specified session and keep a short summary |
+| `/unarchive <session_id\|name>` | Restore an archived session to the active list |
+
+Implementation notes:
+- Session names, archive state, summaries, and last activity are persisted in `~/.<host>-to-im/data/session-meta.json`
+- Archiving the current session automatically creates a fresh session for the current chat, so new messages do not continue writing into the archived task
+- Existing bridge commands such as `/new`, `/bind`, `/status`, `/cwd`, `/mode`, `/stop`, and `/help` remain available
+
 ## Development
 
 ```bash

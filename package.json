@@ -4,11 +4,12 @@
   "description": "Claude Code Skill: Bridge IM platforms (Telegram, Discord, Feishu) to Claude Code sessions",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.js",
+    "postinstall": "node scripts/apply-bridge-patches.mjs",
+    "build": "node scripts/apply-bridge-patches.mjs && node scripts/build.js",
     "render:host": "node scripts/render-host-templates.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/apply-bridge-patches.mjs && tsc --noEmit",
     "dev": "tsx src/main.ts",
-    "test": "CTI_HOME=$(mktemp -d) node --test --import tsx --test-timeout=15000 src/__tests__/*.test.ts"
+    "test": "node scripts/apply-bridge-patches.mjs && CTI_HOME=$(mktemp -d) node --test --test-concurrency=1 --import tsx --test-timeout=15000 src/__tests__/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.62",
