@@ -1,7 +1,7 @@
 ---
 name: claude-to-im
 description: |
-  This skill bridges the current host coding agent to IM platforms (Telegram, Discord, Feishu/Lark).
+  This skill bridges the current host coding agent to IM platforms (Telegram, Discord, Feishu/Lark, QQ).
   It should be used when the user wants to start a background daemon that forwards
   IM messages to host agent sessions, or manage that daemon's lifecycle.
   Trigger on: "claude-to-im", "start bridge", "stop bridge", "bridge status",
@@ -73,10 +73,11 @@ When AskUserQuestion IS available, collect input **one field at a time**. After 
 
 **Step 1 — Choose channels**
 
-Ask which channels to enable (telegram, discord, feishu). Accept comma-separated input. Briefly describe each:
+Ask which channels to enable (telegram, discord, feishu, qq). Accept comma-separated input. Briefly describe each:
 - **telegram** — Best for personal use. Streaming preview, inline permission buttons.
 - **discord** — Good for team use. Server/channel/user-level access control.
 - **feishu** (Lark) — For Feishu/Lark teams. Event-based messaging.
+- **qq** — QQ C2C private chat only. No inline permission buttons, no streaming preview. Permissions use text `/perm ...` commands.
 
 **Step 2 — Collect tokens per channel**
 
@@ -85,6 +86,14 @@ For each enabled channel, read `SKILL_DIR/references/setup-guides.md` and presen
 - **Telegram**: Bot Token → confirm (masked) → Chat ID (see guide for how to get it) → confirm → Allowed User IDs (optional). **Important:** At least one of Chat ID or Allowed User IDs must be set, otherwise the bot will reject all messages.
 - **Discord**: Bot Token → confirm (masked) → Allowed User IDs → Allowed Channel IDs (optional) → Allowed Guild IDs (optional). **Important:** At least one of Allowed User IDs or Allowed Channel IDs must be set, otherwise the bot will reject all messages (default-deny).
 - **Feishu**: App ID → confirm → App Secret → confirm (masked) → Domain (optional) → Allowed User IDs (optional). Guide through all 4 steps (A: batch permissions, B: enable bot, C: events & callbacks with long connection, D: publish version).
+- **QQ**: Collect two required fields, then optional ones:
+  1. QQ App ID (required) → confirm
+  2. QQ App Secret (required) → confirm (masked)
+  - Tell the user: these two values can be found at https://q.qq.com/qqbot/openclaw
+  3. Allowed User OpenIDs (optional, press Enter to skip) — note: this is `user_openid`, NOT QQ number. If the user doesn't have openid yet, they can leave it empty.
+  4. Image Enabled (optional, default true, press Enter to skip) — if the underlying provider doesn't support image input, set to false
+  5. Max Image Size MB (optional, default 20, press Enter to skip)
+  - Remind user: QQ first version only supports C2C private chat sandbox access. No group/channel support, no inline buttons, no streaming preview.
 
 **Step 3 — General settings**
 
@@ -108,6 +117,7 @@ Ask for runtime, default working directory, model, and mode:
    - Telegram: `curl -s "https://api.telegram.org/bot${TOKEN}/getMe"` — check for `"ok":true`
    - Feishu: `curl -s -X POST "${DOMAIN}/open-apis/auth/v3/tenant_access_token/internal" -H "Content-Type: application/json" -d '{"app_id":"...","app_secret":"..."}'` — check for `"code":0`
    - Discord: verify token matches format `[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`
+   - QQ: `POST https://bots.qq.com/app/getAppAccessToken` with `{"appId":"...","clientSecret":"..."}` — check for access_token in response; then `GET https://api.sgroup.qq.com/gateway` with `Authorization: QQBot <token>` — check for gateway URL
 7. Report results with a summary table. If any validation fails, explain what might be wrong and how to fix it.
 8. On success, tell the user: "Setup complete! Run `/claude-to-im start` to start the bridge."
 

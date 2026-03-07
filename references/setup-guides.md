@@ -178,3 +178,46 @@ Leave empty to use the default Feishu domain.
 Feishu user IDs (open_id format like `ou_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`).
 You can find them in the Feishu Admin Console under user profiles.
 Leave empty to allow all users who can message the bot.
+
+---
+
+## QQ
+
+> **Note:** QQ first version only supports **C2C private chat** (sandbox access). Group chat and channel are not supported yet.
+
+### App ID and App Secret (required)
+
+**How to get QQ Bot credentials:**
+1. Go to https://q.qq.com/qqbot/openclaw
+2. Log in and enter the QQ Bot / OpenClaw management page
+3. Create a new QQ Bot or select an existing one
+4. Find **App ID** and **App Secret** on the bot's credential page
+5. Copy both values
+
+These are the only two required fields for QQ.
+
+### Sandbox private chat setup
+
+1. In the QQ Bot management page, configure sandbox access
+2. Scan the QR code with QQ to add the bot as a friend
+3. Send a message to the bot via QQ private chat to start using it
+
+### Allowed User OpenIDs (optional)
+
+**Important:** The value is `user_openid`, NOT QQ number.
+
+`user_openid` is an opaque identifier assigned by the QQ Bot platform to each user. You can obtain it from the bot's message logs after a user sends a message to the bot.
+
+If you don't have the openid yet, leave this field empty. You can add it later via `reconfigure`.
+
+Enter comma-separated openids to restrict access. Leave empty to allow all users who can message the bot.
+
+### Image Enabled (optional)
+
+Default: `true`. Set to `false` if the underlying LLM provider does not support image input.
+
+When enabled, images sent by users in QQ private chat will be forwarded to the AI agent. Image output (sending images back to QQ) is not supported in this version — only text replies.
+
+### Max Image Size MB (optional)
+
+Default: `20`. Maximum image file size in MB that will be forwarded to the AI agent. Images larger than this limit are ignored.

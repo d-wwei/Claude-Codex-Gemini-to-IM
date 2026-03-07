@@ -35,6 +35,12 @@ export interface Config {
   discordAllowedUsers?: string[];
   discordAllowedChannels?: string[];
   discordAllowedGuilds?: string[];
+  // QQ
+  qqAppId?: string;
+  qqAppSecret?: string;
+  qqAllowedUsers?: string[];
+  qqImageEnabled?: boolean;
+  qqMaxImageSize?: number;
   // Auto-approve all tool permission requests without user confirmation
   autoApprove?: boolean;
 }
@@ -131,6 +137,15 @@ export function loadConfig(): Config {
       env.get("CTI_DISCORD_ALLOWED_CHANNELS")
     ),
     discordAllowedGuilds: splitCsv(env.get("CTI_DISCORD_ALLOWED_GUILDS")),
+    qqAppId: env.get("CTI_QQ_APP_ID") || undefined,
+    qqAppSecret: env.get("CTI_QQ_APP_SECRET") || undefined,
+    qqAllowedUsers: splitCsv(env.get("CTI_QQ_ALLOWED_USERS")),
+    qqImageEnabled: env.has("CTI_QQ_IMAGE_ENABLED")
+      ? env.get("CTI_QQ_IMAGE_ENABLED") === "true"
+      : undefined,
+    qqMaxImageSize: env.get("CTI_QQ_MAX_IMAGE_SIZE")
+      ? Number(env.get("CTI_QQ_MAX_IMAGE_SIZE"))
+      : undefined,
     autoApprove: env.get("CTI_AUTO_APPROVE") === "true",
   };
 }
@@ -194,6 +209,16 @@ export function saveConfig(config: Config): void {
     "CTI_DISCORD_ALLOWED_GUILDS",
     config.discordAllowedGuilds?.join(",")
   );
+  out += formatEnvLine("CTI_QQ_APP_ID", config.qqAppId);
+  out += formatEnvLine("CTI_QQ_APP_SECRET", config.qqAppSecret);
+  out += formatEnvLine(
+    "CTI_QQ_ALLOWED_USERS",
+    config.qqAllowedUsers?.join(",")
+  );
+  if (config.qqImageEnabled !== undefined)
+    out += formatEnvLine("CTI_QQ_IMAGE_ENABLED", String(config.qqImageEnabled));
+  if (config.qqMaxImageSize !== undefined)
+    out += formatEnvLine("CTI_QQ_MAX_IMAGE_SIZE", String(config.qqMaxImageSize));
 
   fs.mkdirSync(CTI_HOME, { recursive: true });
   const tmpPath = CONFIG_PATH + ".tmp";
@@ -277,6 +302,22 @@ export function configToSettings(config: Config): Map<string, string> {
   if (config.openaiApiKey) {
     m.set("bridge_openai_api_key", config.openaiApiKey);
   }
+
+  // ── QQ ──
+  // Upstream keys: bridge_qq_enabled, bridge_qq_app_id, bridge_qq_app_secret,
+  //   bridge_qq_allowed_users, bridge_qq_image_enabled, bridge_qq_max_image_size
+  m.set(
+    "bridge_qq_enabled",
+    config.enabledChannels.includes("qq") ? "true" : "false"
+  );
+  if (config.qqAppId) m.set("bridge_qq_app_id", config.qqAppId);
+  if (config.qqAppSecret) m.set("bridge_qq_app_secret", config.qqAppSecret);
+  if (config.qqAllowedUsers)
+    m.set("bridge_qq_allowed_users", config.qqAllowedUsers.join(","));
+  if (config.qqImageEnabled !== undefined)
+    m.set("bridge_qq_image_enabled", String(config.qqImageEnabled));
+  if (config.qqMaxImageSize !== undefined)
+    m.set("bridge_qq_max_image_size", String(config.qqMaxImageSize));
 
   // ── Defaults ──
   // Upstream keys: bridge_default_work_dir, bridge_default_model, default_model

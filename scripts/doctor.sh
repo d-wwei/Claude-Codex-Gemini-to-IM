@@ -208,6 +208,33 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
   fi
 
+  # --- QQ ---
+  if echo "$CTI_CHANNELS" | grep -q qq; then
+    QQ_APP_ID=$(get_config CTI_QQ_APP_ID)
+    QQ_APP_SECRET=$(get_config CTI_QQ_APP_SECRET)
+    if [ -n "$QQ_APP_ID" ] && [ -n "$QQ_APP_SECRET" ]; then
+      QQ_TOKEN_RESULT=$(curl -s --max-time 10 -X POST "https://bots.qq.com/app/getAppAccessToken" \
+        -H "Content-Type: application/json" \
+        -d "{\"appId\":\"${QQ_APP_ID}\",\"clientSecret\":\"${QQ_APP_SECRET}\"}" 2>/dev/null || echo '{}')
+      QQ_ACCESS_TOKEN=$(echo "$QQ_TOKEN_RESULT" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+      if [ -n "$QQ_ACCESS_TOKEN" ]; then
+        check "QQ app credentials are valid (access_token obtained)" 0
+        # Verify gateway availability
+        QQ_GW_RESULT=$(curl -s --max-time 10 "https://api.sgroup.qq.com/gateway" \
+          -H "Authorization: QQBot ${QQ_ACCESS_TOKEN}" 2>/dev/null || echo '{}')
+        if echo "$QQ_GW_RESULT" | grep -q '"url"'; then
+          check "QQ gateway is reachable" 0
+        else
+          check "QQ gateway is reachable (GET /gateway failed)" 1
+        fi
+      else
+        check "QQ app credentials are valid (getAppAccessToken failed)" 1
+      fi
+    else
+      check "QQ app credentials configured" 1
+    fi
+  fi
+
   # --- Discord ---
   if echo "$CTI_CHANNELS" | grep -q discord; then
     DC_TOKEN=$(get_config CTI_DISCORD_BOT_TOKEN)

@@ -102,6 +102,54 @@ describe('configToSettings', () => {
     assert.equal(m.get('bridge_openai_api_key'), 'openai-key');
   });
 
+  it('sets bridge_qq_enabled based on enabledChannels', () => {
+    const m = configToSettings({ ...base, enabledChannels: ['qq'] });
+    assert.equal(m.get('bridge_qq_enabled'), 'true');
+    assert.equal(m.get('bridge_telegram_enabled'), 'false');
+  });
+
+  it('defaults bridge_qq_enabled to false', () => {
+    const m = configToSettings(base);
+    assert.equal(m.get('bridge_qq_enabled'), 'false');
+  });
+
+  it('maps qq config fields', () => {
+    const m = configToSettings({
+      ...base,
+      enabledChannels: ['qq'],
+      qqAppId: 'qq-app-id',
+      qqAppSecret: 'qq-secret',
+      qqAllowedUsers: ['openid1', 'openid2'],
+    });
+    assert.equal(m.get('bridge_qq_app_id'), 'qq-app-id');
+    assert.equal(m.get('bridge_qq_app_secret'), 'qq-secret');
+    assert.equal(m.get('bridge_qq_allowed_users'), 'openid1,openid2');
+  });
+
+  it('maps qq image settings', () => {
+    const m = configToSettings({
+      ...base,
+      enabledChannels: ['qq'],
+      qqAppId: 'id',
+      qqAppSecret: 'secret',
+      qqImageEnabled: false,
+      qqMaxImageSize: 10,
+    });
+    assert.equal(m.get('bridge_qq_image_enabled'), 'false');
+    assert.equal(m.get('bridge_qq_max_image_size'), '10');
+  });
+
+  it('omits qq image settings when not set', () => {
+    const m = configToSettings({
+      ...base,
+      enabledChannels: ['qq'],
+      qqAppId: 'id',
+      qqAppSecret: 'secret',
+    });
+    assert.equal(m.has('bridge_qq_image_enabled'), false);
+    assert.equal(m.has('bridge_qq_max_image_size'), false);
+  });
+
   it('maps workdir and mode, omits model when not set', () => {
     const m = configToSettings(base);
     assert.equal(m.get('bridge_default_work_dir'), '/tmp/test');
@@ -170,6 +218,7 @@ describe('loadConfig/saveConfig round-trip', () => {
     assert.equal(m.get('bridge_telegram_enabled'), 'false');
     assert.equal(m.get('bridge_discord_enabled'), 'false');
     assert.equal(m.get('bridge_feishu_enabled'), 'false');
+    assert.equal(m.get('bridge_qq_enabled'), 'false');
   });
 
   it('preserves codex execution overrides when saving and loading config', async () => {

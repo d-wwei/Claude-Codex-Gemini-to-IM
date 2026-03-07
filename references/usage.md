@@ -12,7 +12,7 @@ Interactive wizard that configures the bridge.
 
 The wizard will prompt you for:
 
-1. **Channels to enable** -- Enter comma-separated values: `telegram`, `discord`, `feishu`
+1. **Channels to enable** -- Enter comma-separated values: `telegram`, `discord`, `feishu`, `qq`
 2. **Platform credentials** -- Bot tokens, app IDs, and secrets for each enabled channel
 3. **Allowed users** (optional) -- Restrict which users can interact with the bot
 4. **Working directory** -- Default project directory for host-agent sessions
@@ -114,6 +114,7 @@ Checks performed:
 - Config file exists and has correct permissions
 - Required tokens are set for enabled channels
 - Token validity (API calls)
+- QQ credentials and gateway reachability (if QQ enabled)
 - Daemon process health
 - Log directory writability
 
@@ -138,3 +139,14 @@ Behavior summary:
 - `/unarchive` restores an archived session
 
 These commands are handled at the bridge layer, so they work consistently across Claude, Codex, and Gemini host variants.
+
+### QQ notes
+
+QQ currently supports **C2C private chat only**:
+- No inline approval buttons — permissions use text `/perm ...` commands
+- No streaming preview
+- Image inbound only (no image replies)
+- No group/channel support yet
+- Required config: `CTI_QQ_APP_ID`, `CTI_QQ_APP_SECRET` (obtain from https://q.qq.com/qqbot/openclaw)
+- `CTI_QQ_ALLOWED_USERS` takes `user_openid` values, not QQ numbers
+- Set `CTI_QQ_IMAGE_ENABLED=false` if the provider doesn't support image input
