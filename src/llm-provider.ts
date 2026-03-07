@@ -6,13 +6,17 @@
  */
 
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { execSync, execFileSync } from 'node:child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { LLMProvider, StreamChatParams, FileAttachment } from 'claude-to-im/src/lib/bridge/host.js';
 import type { PendingPermissions } from './permission-gateway.js';
 
 import { sseEvent } from './sse-utils.js';
+
+const require = createRequire(import.meta.url);
 
 // ── Environment isolation ──
 
@@ -300,7 +304,8 @@ function sdkCliFallback(): string | undefined {
 }
 
 /**
- * Verify a native binary can actually be spawned in the current process context.
+ * Verify that a native binary can actually be spawned in the current process context.
+ * X_OK alone is insufficient in some launchd-style environments.
  */
 function canSpawn(binaryPath: string): boolean {
   try {
@@ -321,11 +326,11 @@ function canSpawn(binaryPath: string): boolean {
  *
  * This multi-candidate approach handles the common scenario where
  * nvm/npm puts an old 1.x claude in PATH before the native 2.x CLI.
- * For native binaries, validates that spawn actually works and falls back to the
- * SDK's bundled cli.js if needed (e.g. launchd sandbox restrictions).
+ * For auto-detected native binaries, validates that spawn actually works and falls
+ * back to the SDK's bundled cli.js if needed.
  */
 export function resolveClaudeCliPath(): string | undefined {
-  // 1. Explicit env var — trust the user
+  // 1. Explicit env var — trust it without spawn-testing.
   const fromEnv = process.env.CTI_CLAUDE_CODE_EXECUTABLE;
   if (fromEnv && isExecutable(fromEnv)) return fromEnv;
 

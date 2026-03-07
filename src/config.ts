@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { getHostProfile } from "./host-profile.js";
 
@@ -60,6 +61,18 @@ function parseEnvFile(content: string): Map<string, string> {
   return entries;
 }
 
+/**
+ * Expand the only supported shell-style placeholders used in config.env:
+ * $HOME and $CWD (including ${HOME} / ${CWD} forms).
+ */
+export function expandShellVars(value: string): string {
+  return value
+    .replace(/\$\{HOME\}/g, os.homedir())
+    .replace(/\$HOME/g, os.homedir())
+    .replace(/\$\{CWD\}/g, process.cwd())
+    .replace(/\$CWD/g, process.cwd());
+}
+
 function splitCsv(value: string | undefined): string[] | undefined {
   if (!value) return undefined;
   return value
@@ -83,7 +96,7 @@ export function loadConfig(): Config {
   return {
     runtime,
     enabledChannels: splitCsv(env.get("CTI_ENABLED_CHANNELS")) ?? [],
-    defaultWorkDir: env.get("CTI_DEFAULT_WORKDIR") || process.cwd(),
+    defaultWorkDir: expandShellVars(env.get("CTI_DEFAULT_WORKDIR") || process.cwd()),
     defaultModel: env.get("CTI_DEFAULT_MODEL") || undefined,
     defaultMode: env.get("CTI_DEFAULT_MODE") || "code",
     codexSkipGitRepoCheck: env.get("CTI_CODEX_SKIP_GIT_REPO_CHECK") !== "false",
