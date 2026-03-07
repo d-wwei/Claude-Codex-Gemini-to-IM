@@ -6,13 +6,17 @@
  */
 
 import fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { execSync, execFileSync } from 'node:child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { LLMProvider, StreamChatParams, FileAttachment } from 'claude-to-im/src/lib/bridge/host.js';
 import type { PendingPermissions } from './permission-gateway.js';
 
 import { sseEvent } from './sse-utils.js';
+
+const require = createRequire(import.meta.url);
 
 // ── Environment isolation ──
 
@@ -96,11 +100,41 @@ function isExecutable(p: string): boolean {
 }
 
 /**
+ * Return the path to the SDK's bundled cli.js, which can always be run via `node`.
+ * Used as a fallback when the native binary cannot be spawned.
+ */
+function sdkCliFallback(): string | undefined {
+  try {
+    const sdkMain = require.resolve('@anthropic-ai/claude-agent-sdk');
+    const candidate = path.join(path.dirname(sdkMain), 'cli.js');
+    if (isExecutable(candidate)) return candidate;
+  } catch {
+    // SDK not resolvable
+  }
+  return undefined;
+}
+
+/**
+ * Verify that a native binary can actually be spawned in the current process context.
+ * X_OK alone is insufficient in some launchd-style environments.
+ */
+function canSpawn(binaryPath: string): boolean {
+  try {
+    execFileSync(binaryPath, ['--version'], { timeout: 3000, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve the path to the `claude` CLI executable.
  * Priority: CTI_CLAUDE_CODE_EXECUTABLE env → which/where command → common install paths.
+ * For auto-detected native binaries, validates that spawn actually works and falls
+ * back to the SDK's bundled cli.js if not.
  */
 export function resolveClaudeCliPath(): string | undefined {
-  // 1. Explicit env var
+  // 1. Explicit env var — trust it without spawn-testing.
   const fromEnv = process.env.CTI_CLAUDE_CODE_EXECUTABLE;
   if (fromEnv && isExecutable(fromEnv)) return fromEnv;
 
@@ -109,7 +143,11 @@ export function resolveClaudeCliPath(): string | undefined {
   const cmd = isWindows ? 'where claude' : 'which claude';
   try {
     const resolved = execSync(cmd, { encoding: 'utf-8', timeout: 3000 }).trim().split('\n')[0];
-    if (resolved && isExecutable(resolved)) return resolved;
+    if (resolved && isExecutable(resolved)) {
+      if (canSpawn(resolved)) return resolved;
+      console.warn(`[llm-provider] '${resolved}' exists but cannot be spawned — falling back to SDK cli.js`);
+      return sdkCliFallback();
+    }
   } catch {
     // not found in PATH
   }
@@ -127,7 +165,11 @@ export function resolveClaudeCliPath(): string | undefined {
         `${process.env.HOME}/.local/bin/claude`,
       ];
   for (const p of candidates) {
-    if (p && isExecutable(p)) return p;
+    if (p && isExecutable(p)) {
+      if (canSpawn(p)) return p;
+      console.warn(`[llm-provider] '${p}' exists but cannot be spawned — falling back to SDK cli.js`);
+      return sdkCliFallback();
+    }
   }
 
   return undefined;

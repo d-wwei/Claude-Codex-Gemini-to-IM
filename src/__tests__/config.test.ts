@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { maskSecret, configToSettings, type Config } from '../config.js';
+import { expandShellVars, maskSecret, configToSettings, type Config } from '../config.js';
 import { buildHostProfile, inferHostFromPath, inferHostFromSkillCommand } from '../host-profile.js';
 
 // ── maskSecret ──
@@ -145,6 +145,16 @@ describe('loadConfig/saveConfig round-trip', () => {
     assert.equal(m.get('bridge_telegram_enabled'), 'false');
     assert.equal(m.get('bridge_discord_enabled'), 'false');
     assert.equal(m.get('bridge_feishu_enabled'), 'false');
+  });
+});
+
+describe('expandShellVars', () => {
+  it('expands the supported $HOME and $CWD placeholders', () => {
+    const expanded = expandShellVars('$HOME/project:${CWD}:${HOME}:${PWD}');
+    assert.ok(expanded.startsWith(`${os.homedir()}/project:`));
+    assert.ok(expanded.includes(`:${process.cwd()}:`));
+    assert.ok(expanded.includes(`:${os.homedir()}:`));
+    assert.ok(expanded.endsWith(':${PWD}'));
   });
 });
 
