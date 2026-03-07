@@ -24,6 +24,7 @@ import { CTI_HOME } from './config.js';
 
 const DATA_DIR = path.join(CTI_HOME, 'data');
 const MESSAGES_DIR = path.join(DATA_DIR, 'messages');
+const SESSION_META_FILE = path.join(DATA_DIR, 'session-meta.json');
 
 // ── Helpers ──
 
@@ -66,11 +67,29 @@ interface LockEntry {
   expiresAt: number;
 }
 
+export interface SessionMeta {
+  name?: string;
+  created_at?: string;
+  last_active_at?: string;
+  archived?: boolean;
+  archived_at?: string;
+  archive_summary?: string;
+  last_channel_type?: string;
+  last_chat_id?: string;
+}
+
+export interface SessionRecord {
+  session: BridgeSession;
+  meta: SessionMeta;
+  bindings: ChannelBinding[];
+}
+
 // ── Store ──
 
 export class JsonFileStore implements BridgeStore {
   private settings: Map<string, string>;
   private sessions = new Map<string, BridgeSession>();
+  private sessionMeta = new Map<string, SessionMeta>();
   private bindings = new Map<string, ChannelBinding>();
   private messages = new Map<string, BridgeMessage[]>();
   private permissionLinks = new Map<string, PermissionLinkRecord>();
@@ -96,6 +115,11 @@ export class JsonFileStore implements BridgeStore {
     );
     for (const [id, s] of Object.entries(sessions)) {
       this.sessions.set(id, s);
+    }
+
+    const sessionMeta = readJson<Record<string, SessionMeta>>(SESSION_META_FILE, {});
+    for (const [id, meta] of Object.entries(sessionMeta)) {
+      this.sessionMeta.set(id, meta);
     }
 
     // Bindings
@@ -143,6 +167,10 @@ export class JsonFileStore implements BridgeStore {
       path.join(DATA_DIR, 'sessions.json'),
       Object.fromEntries(this.sessions),
     );
+  }
+
+  private persistSessionMeta(): void {
+    writeJson(SESSION_META_FILE, Object.fromEntries(this.sessionMeta));
   }
 
   private persistBindings(): void {
@@ -219,6 +247,10 @@ export class JsonFileStore implements BridgeStore {
       };
       this.bindings.set(key, updated);
       this.persistBindings();
+      this.touchSession(updated.codepilotSessionId, {
+        channelType: updated.channelType,
+        chatId: updated.chatId,
+      });
       return updated;
     }
     const binding: ChannelBinding = {
@@ -236,14 +268,23 @@ export class JsonFileStore implements BridgeStore {
     };
     this.bindings.set(key, binding);
     this.persistBindings();
+    this.touchSession(binding.codepilotSessionId, {
+      channelType: binding.channelType,
+      chatId: binding.chatId,
+    });
     return binding;
   }
 
   updateChannelBinding(id: string, updates: Partial<ChannelBinding>): void {
     for (const [key, b] of this.bindings) {
       if (b.id === id) {
-        this.bindings.set(key, { ...b, ...updates, updatedAt: now() });
+        const updated = { ...b, ...updates, updatedAt: now() };
+        this.bindings.set(key, updated);
         this.persistBindings();
+        this.touchSession(updated.codepilotSessionId, {
+          channelType: updated.channelType,
+          chatId: updated.chatId,
+        });
         break;
       }
     }
@@ -261,6 +302,66 @@ export class JsonFileStore implements BridgeStore {
     return this.sessions.get(id) ?? null;
   }
 
+  listSessions(): BridgeSession[] {
+    return Array.from(this.sessions.values());
+  }
+
+  listSessionRecords(): SessionRecord[] {
+    const bindings = Array.from(this.bindings.values());
+    return Array.from(this.sessions.values()).map((session) => ({
+      session,
+      meta: this.getSessionMeta(session.id) ?? {},
+      bindings: bindings.filter((binding) => binding.codepilotSessionId === session.id),
+    }));
+  }
+
+  getSessionMeta(sessionId: string): SessionMeta | null {
+    return this.sessionMeta.get(sessionId) ?? null;
+  }
+
+  private upsertSessionMeta(sessionId: string, updates: Partial<SessionMeta>): SessionMeta {
+    const existing = this.sessionMeta.get(sessionId) ?? {};
+    const merged: SessionMeta = { ...existing, ...updates };
+    this.sessionMeta.set(sessionId, merged);
+    this.persistSessionMeta();
+    return merged;
+  }
+
+  setSessionName(sessionId: string, name: string): void {
+    this.upsertSessionMeta(sessionId, { name, last_active_at: now() });
+  }
+
+  archiveSession(sessionId: string, summary: string): void {
+    this.upsertSessionMeta(sessionId, {
+      archived: true,
+      archived_at: now(),
+      archive_summary: summary,
+      last_active_at: now(),
+    });
+  }
+
+  unarchiveSession(sessionId: string): void {
+    const existing = this.sessionMeta.get(sessionId) ?? {};
+    this.sessionMeta.set(sessionId, {
+      ...existing,
+      archived: false,
+      archived_at: undefined,
+      last_active_at: now(),
+    });
+    this.persistSessionMeta();
+  }
+
+  touchSession(
+    sessionId: string,
+    updates?: { channelType?: string; chatId?: string },
+  ): void {
+    this.upsertSessionMeta(sessionId, {
+      last_active_at: now(),
+      ...(updates?.channelType ? { last_channel_type: updates.channelType } : {}),
+      ...(updates?.chatId ? { last_chat_id: updates.chatId } : {}),
+    });
+  }
+
   createSession(
     _name: string,
     model: string,
@@ -276,6 +377,11 @@ export class JsonFileStore implements BridgeStore {
     };
     this.sessions.set(session.id, session);
     this.persistSessions();
+    this.upsertSessionMeta(session.id, {
+      name: _name || undefined,
+      created_at: now(),
+      last_active_at: now(),
+    });
     return session;
   }
 
@@ -293,6 +399,7 @@ export class JsonFileStore implements BridgeStore {
     const msgs = this.loadMessages(sessionId);
     msgs.push({ role, content });
     this.persistMessages(sessionId);
+    this.touchSession(sessionId);
   }
 
   getMessages(sessionId: string, opts?: { limit?: number }): { messages: BridgeMessage[] } {

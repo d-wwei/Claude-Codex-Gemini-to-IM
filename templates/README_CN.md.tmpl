@@ -144,6 +144,17 @@ bash ~/code/Claude-to-IM-skill/scripts/install-host.sh --host gemini
 | `/{{SKILL_COMMAND}} reconfigure` | "reconfigure" / "修改配置" | 交互式修改配置 |
 | `/{{SKILL_COMMAND}} doctor` | "doctor" / "诊断" | 诊断问题 |
 
+Bridge 还内建了一组可在 IM 聊天中直接使用的会话管理命令：
+
+| IM 命令 | 说明 |
+|---|---|
+| `/lsessions` | 列出活跃 bridge 会话，显示名称、短 ID、渠道、状态、最近活跃时间和摘要 |
+| `/lsessions --all` | 同时显示已归档会话 |
+| `/switchto &lt;session_id\|name&gt;` | 让当前聊天切换到一个已有会话，支持按 ID 或名称切换 |
+| `/rename &lt;new_name&gt;` | 重命名当前会话 |
+| `/archive [session_id\|name]` | 归档当前会话或指定会话，并保留简短摘要 |
+| `/unarchive &lt;session_id\|name&gt;` | 恢复一个已归档会话 |
+
 ## 平台配置指南
 
 `setup` 向导会在每一步提供内联指引，以下是概要：

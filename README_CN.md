@@ -52,6 +52,24 @@ bash scripts/install-host.sh --host gemini
 - 故障排查参考：[references/troubleshooting.md](references/troubleshooting.md)
 - 安全说明：[SECURITY.md](SECURITY.md)
 
+## 内建会话管理命令
+
+桥接现在在桥接层内建了一组会话管理命令。因为这些命令会在消息转发给底层代理之前先被处理，所以 Claude、Codex、Gemini 三个宿主变体的行为是一致的。
+
+| 命令 | 效果 |
+|---|---|
+| `/lsessions` | 列出活跃 bridge 会话，显示名称、短 ID、渠道、状态、最近活跃时间和摘要 |
+| `/lsessions --all` | 列出全部会话，包括已归档会话 |
+| `/switchto <session_id\|name>` | 让当前 IM 对话切换到一个已有会话，支持按 ID 或已命名名称切换 |
+| `/rename <new_name>` | 重命名当前会话 |
+| `/archive [session_id\|name]` | 归档当前会话或指定会话，并保留简短摘要 |
+| `/unarchive <session_id\|name>` | 恢复一个已归档会话到活跃列表 |
+
+实现说明：
+- 会话名称、归档状态、摘要和最近活跃时间会持久化到 `~/.<host>-to-im/data/session-meta.json`
+- 如果归档的是当前会话，桥接会自动为当前聊天创建一个新会话，避免后续消息继续写入归档任务
+- 现有的 `/new`、`/bind`、`/status`、`/cwd`、`/mode`、`/stop`、`/help` 等命令仍然可用
+
 ## 开发
 
 ```bash

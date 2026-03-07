@@ -128,3 +128,25 @@ QQ currently supports **C2C private chat only**:
 - Required config: `CTI_QQ_APP_ID`, `CTI_QQ_APP_SECRET` (obtain from https://q.qq.com/qqbot/openclaw)
 - `CTI_QQ_ALLOWED_USERS` takes `user_openid` values, not QQ numbers
 - Set `CTI_QQ_IMAGE_ENABLED=false` if the provider doesn't support image input
+
+## IM session commands
+
+Inside IM chats, the bridge also supports built-in session-management commands:
+
+```
+/lsessions
+/lsessions --all
+/switchto <session_id|name>
+/rename <new_name>
+/archive [session_id|name]
+/unarchive <session_id|name>
+```
+
+Behavior summary:
+- `/lsessions` lists active sessions; `--all` includes archived sessions
+- `/switchto` rebinds the current IM chat to a previous session by ID or assigned name
+- `/rename` assigns a friendly name to the current session
+- `/archive` stores a short summary and hides the session from the default list
+- `/unarchive` restores an archived session
+
+These commands are handled at the bridge layer, so they work consistently across Claude, Codex, and Gemini host variants.
