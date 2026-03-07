@@ -26,7 +26,13 @@ function makeFakeController() {
 }
 
 function freshState(): StreamState {
-  return { hasReceivedResult: false, hasStreamedText: false, lastAssistantText: '' };
+  return {
+    hasReceivedResult: false,
+    hasStreamedText: false,
+    sawTextDelta: false,
+    seenToolUseIds: new Set<string>(),
+    lastAssistantText: '',
+  };
 }
 
 // ── classifyAuthError ──
@@ -266,7 +272,7 @@ describe('catch block error suppression logic', () => {
   // the state conditions that drive its behavior.
 
   it('result received + exit code → should suppress (transport noise)', () => {
-    const state: StreamState = { hasReceivedResult: true, hasStreamedText: true, lastAssistantText: '' };
+    const state: StreamState = { ...freshState(), hasReceivedResult: true, hasStreamedText: true };
     const errorMsg = 'Claude Code process exited with code 1';
     const isTransportExit = errorMsg.includes('process exited with code');
 
@@ -276,7 +282,7 @@ describe('catch block error suppression logic', () => {
   });
 
   it('partial text + exit code (no result) → should NOT suppress (real crash)', () => {
-    const state: StreamState = { hasReceivedResult: false, hasStreamedText: true, lastAssistantText: '' };
+    const state: StreamState = { ...freshState(), hasStreamedText: true };
     const errorMsg = 'Claude Code process exited with code 1';
     const isTransportExit = errorMsg.includes('process exited with code');
 
@@ -286,8 +292,7 @@ describe('catch block error suppression logic', () => {
 
   it('assistant text with recognised auth error → should surface as business error', () => {
     const state: StreamState = {
-      hasReceivedResult: false,
-      hasStreamedText: false,
+      ...freshState(),
       lastAssistantText: 'Your organization does not have access to Claude',
     };
 
@@ -298,8 +303,7 @@ describe('catch block error suppression logic', () => {
 
   it('assistant text with normal content + crash → should NOT surface as business error', () => {
     const state: StreamState = {
-      hasReceivedResult: false,
-      hasStreamedText: false,
+      ...freshState(),
       lastAssistantText: 'Here is my analysis of the code...',
     };
 
@@ -309,7 +313,7 @@ describe('catch block error suppression logic', () => {
   });
 
   it('no streaming + no assistant text → should show full error', () => {
-    const state: StreamState = { hasReceivedResult: false, hasStreamedText: false, lastAssistantText: '' };
+    const state: StreamState = freshState();
 
     const shouldSurface = !!state.lastAssistantText && classifyAuthError(state.lastAssistantText) !== false;
     const shouldSuppress = state.hasReceivedResult;
@@ -321,10 +325,63 @@ describe('catch block error suppression logic', () => {
   it('streaming + result + exit code → should suppress', () => {
     // Normal successful flow that ends with exit code 0 won't throw,
     // but some edge cases might. Verify suppression.
-    const state: StreamState = { hasReceivedResult: true, hasStreamedText: true, lastAssistantText: 'some response' };
+    const state: StreamState = { ...freshState(), hasReceivedResult: true, hasStreamedText: true, lastAssistantText: 'some response' };
     const isTransportExit = true;
 
     const shouldSuppress = state.hasReceivedResult && isTransportExit;
     assert.equal(shouldSuppress, true);
+  });
+});
+
+describe('handleMessage dedupe', () => {
+  it('does not emit final assistant text again after text deltas', () => {
+    const { controller, chunks } = makeFakeController();
+    const state = freshState();
+
+    handleMessage({
+      type: 'stream_event',
+      event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'hello' } },
+    } as any, controller, state);
+
+    handleMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'hello' }] },
+    } as any, controller, state);
+
+    assert.equal(chunks.length, 1);
+    assert.ok(chunks[0].includes('hello'));
+  });
+
+  it('does not emit duplicate tool_use blocks from final assistant payload', () => {
+    const { controller, chunks } = makeFakeController();
+    const state = freshState();
+
+    handleMessage({
+      type: 'stream_event',
+      event: { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tool-1', name: 'Bash' } },
+    } as any, controller, state);
+
+    handleMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'tool_use', id: 'tool-1', name: 'Bash', input: {} }] },
+    } as any, controller, state);
+
+    assert.equal(chunks.length, 1);
+    assert.ok(chunks[0].includes('tool_use'));
+    assert.ok(chunks[0].includes('tool-1'));
+  });
+
+  it('emits final assistant text when no deltas were streamed', () => {
+    const { controller, chunks } = makeFakeController();
+    const state = freshState();
+
+    handleMessage({
+      type: 'assistant',
+      message: { content: [{ type: 'text', text: 'final-only' }] },
+    } as any, controller, state);
+
+    assert.equal(chunks.length, 1);
+    assert.ok(chunks[0].includes('final-only'));
+    assert.equal(state.lastAssistantText, 'final-only');
   });
 });

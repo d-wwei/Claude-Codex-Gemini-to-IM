@@ -7,7 +7,6 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
 import { execSync, execFileSync } from 'node:child_process';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
@@ -15,8 +14,6 @@ import type { LLMProvider, StreamChatParams, FileAttachment } from 'claude-to-im
 import type { PendingPermissions } from './permission-gateway.js';
 
 import { sseEvent } from './sse-utils.js';
-
-const require = createRequire(import.meta.url);
 
 // ── Environment isolation ──
 
@@ -480,6 +477,10 @@ export interface StreamState {
   hasReceivedResult: boolean;
   /** True once any text_delta has been emitted via stream_event. */
   hasStreamedText: boolean;
+  /** True once a text delta has been observed from stream_event. */
+  sawTextDelta: boolean;
+  /** Tracks tool IDs already emitted from partial streaming to avoid duplicates. */
+  seenToolUseIds: Set<string>;
   /**
    * Full text captured from the final `assistant` message.
    * NOT emitted during normal flow (stream_event deltas handle that).
@@ -509,7 +510,13 @@ export class SDKLLMProvider implements LLMProvider {
           // Ring-buffer for recent stderr output (max 4 KB)
           const MAX_STDERR = 4096;
           let stderrBuf = '';
-          const state: StreamState = { hasReceivedResult: false, hasStreamedText: false, lastAssistantText: '' };
+          const state: StreamState = {
+            hasReceivedResult: false,
+            hasStreamedText: false,
+            sawTextDelta: false,
+            seenToolUseIds: new Set<string>(),
+            lastAssistantText: '',
+          };
 
           try {
             const cleanEnv = buildSubprocessEnv();
@@ -587,7 +594,6 @@ export class SDKLLMProvider implements LLMProvider {
               prompt: prompt as Parameters<typeof query>[0]['prompt'],
               options: queryOptions as Parameters<typeof query>[0]['options'],
             });
-
             for await (const msg of q) {
               handleMessage(msg, controller, state);
             }
@@ -680,13 +686,15 @@ export function handleMessage(
         event.delta.type === 'text_delta'
       ) {
         // Emit delta text — the bridge accumulates on its side
-        controller.enqueue(sseEvent('text', event.delta.text));
+        state.sawTextDelta = true;
         state.hasStreamedText = true;
+        controller.enqueue(sseEvent('text', event.delta.text));
       }
       if (
         event.type === 'content_block_start' &&
         event.content_block.type === 'tool_use'
       ) {
+        state.seenToolUseIds.add(event.content_block.id);
         controller.enqueue(
           sseEvent('tool_use', {
             id: event.content_block.id,
@@ -710,7 +718,15 @@ export function handleMessage(
         for (const block of msg.message.content) {
           if (block.type === 'text' && block.text) {
             state.lastAssistantText += (state.lastAssistantText ? '\n' : '') + block.text;
-          } else if (block.type === 'tool_use') {
+            if (!state.sawTextDelta && !classifyAuthError(block.text)) {
+              state.hasStreamedText = true;
+              controller.enqueue(sseEvent('text', block.text));
+            }
+            continue;
+          }
+          if (block.type === 'tool_use') {
+            if (state.seenToolUseIds.has(block.id)) continue;
+            state.seenToolUseIds.add(block.id);
             controller.enqueue(
               sseEvent('tool_use', {
                 id: block.id,
@@ -791,3 +807,7 @@ export function handleMessage(
       break;
   }
 }
+
+export const __testOnly = {
+  handleMessage,
+};
