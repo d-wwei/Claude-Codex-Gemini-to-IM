@@ -33,6 +33,7 @@ import {
   buildCardContent,
   buildPostContent,
 } from '../markdown/feishu';
+import * as broker from '../permission-broker';
 
 /** Max number of message_ids to keep for dedup. */
 const DEDUP_MAX = 1000;
@@ -147,7 +148,7 @@ export class FeishuAdapter extends BaseChannelAdapter {
         await this.handleIncomingEvent(data as FeishuMessageEventData);
       },
       'card.action.trigger': async (data) => {
-        await this.handleCardActionEvent(data as FeishuCardActionEventData);
+        return this.handleCardActionEvent(data as FeishuCardActionEventData);
       },
     });
 
@@ -425,7 +426,7 @@ export class FeishuAdapter extends BaseChannelAdapter {
     // Use the classic interactive-card shape (`config/header/elements`).
     // The current Feishu API rejects `tag: action` inside schema 2.0 cards.
     const cardJson = JSON.stringify({
-      config: { wide_screen_mode: true },
+      config: { wide_screen_mode: true, update_multi: true },
       header: {
         template: 'orange',
         title: { tag: 'plain_text', content: '🔐 Permission Required' },
@@ -532,36 +533,140 @@ export class FeishuAdapter extends BaseChannelAdapter {
     }
   }
 
-  private async handleCardActionEvent(data: FeishuCardActionEventData): Promise<void> {
+  private async handleCardActionEvent(
+    data: FeishuCardActionEventData,
+  ): Promise<Record<string, unknown> | undefined> {
     try {
       const value = data.action?.value;
       const callbackData = typeof value?.callbackData === 'string' ? value.callbackData : '';
       const chatId = typeof value?.chatId === 'string' ? value.chatId : '';
-      const userId = data.open_id || data.user_id || '';
 
       if (!callbackData || !chatId) {
         console.warn('[feishu-adapter] Ignoring card action without callbackData/chatId');
-        return;
+        return undefined;
       }
 
-      const inbound: InboundMessage = {
-        messageId: data.open_message_id || `card-action-${Date.now()}`,
-        address: {
-          channelType: 'feishu',
-          chatId,
-          userId,
-        },
-        text: callbackData,
-        timestamp: Date.now(),
+      const handled = broker.handlePermissionCallback(
         callbackData,
-      };
+        chatId,
+        data.open_message_id,
+      );
 
-      this.enqueue(inbound);
+      const [, , permissionId = ''] = callbackData.split(':');
+      const link = permissionId
+        ? getBridgeContext().store.getPermissionLink(permissionId)
+        : null;
+      const targetMessageId = link?.messageId || data.open_message_id;
+      const resultCard = this.buildPermissionResultCard(callbackData, handled);
+
+      if (targetMessageId) {
+        this.schedulePermissionResultCardPatch(targetMessageId, resultCard);
+      }
+
+      if (!handled) {
+        console.warn('[feishu-adapter] Permission card action was not accepted:', callbackData);
+      }
+      // Let Feishu show its default click acknowledgement. We update the
+      // original card asynchronously to avoid racing the interaction callback.
+      return undefined;
     } catch (err) {
       console.error(
         '[feishu-adapter] Unhandled error in card action handler:',
         err instanceof Error ? err.stack || err.message : err,
       );
+      return undefined;
+    }
+  }
+
+  private buildPermissionResultCard(
+    callbackData: string,
+    handled: boolean,
+  ): Record<string, unknown> {
+    const [, action = 'unknown', permissionId = ''] = callbackData.split(':');
+    const selectedLabel = this.permissionActionLabel(action);
+    const headerTemplate = action === 'deny' ? 'red' : 'green';
+    const title = handled ? 'Permission Resolved' : 'Permission Already Handled';
+    const summary = handled
+      ? `**Selected:** ${selectedLabel}\n**Request ID:** \`${permissionId}\``
+      : `**Selection ignored:** ${selectedLabel}\nThis permission request was already handled or no longer exists.\n**Request ID:** \`${permissionId}\``;
+
+    const stateLines = [
+      this.buildResolvedButton('Allow', action === 'allow', 'primary'),
+      this.buildResolvedButton('Allow Session', action === 'allow_session', 'primary'),
+      this.buildResolvedButton('Deny', action === 'deny', 'danger'),
+    ];
+
+    return {
+      config: { wide_screen_mode: true, update_multi: true },
+      header: {
+        template: handled ? headerTemplate : 'grey',
+        title: { tag: 'plain_text', content: title },
+      },
+      elements: [
+        { tag: 'markdown', content: summary },
+        { tag: 'hr' },
+        {
+          tag: 'action',
+          actions: stateLines,
+        },
+      ],
+    };
+  }
+
+  private async patchPermissionResultCard(
+    messageId: string,
+    card: Record<string, unknown>,
+  ): Promise<void> {
+    if (!this.restClient) return;
+    try {
+      const res = await this.restClient.im.message.patch({
+        path: { message_id: messageId },
+        data: { content: JSON.stringify(card) },
+      });
+      if (res?.code === 0) {
+        console.log('[feishu-adapter] Patched permission result card:', messageId);
+        return;
+      }
+      console.warn('[feishu-adapter] Permission result card patch returned non-zero code:', res?.code, res?.msg);
+    } catch (err) {
+      console.warn('[feishu-adapter] Failed to patch permission result card:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  private schedulePermissionResultCardPatch(
+    messageId: string,
+    card: Record<string, unknown>,
+  ): void {
+    setTimeout(() => {
+      void this.patchPermissionResultCard(messageId, card);
+    }, 250);
+  }
+
+  private buildResolvedButton(
+    label: string,
+    selected: boolean,
+    selectedType: 'primary' | 'danger',
+  ): { tag: 'button'; text: { tag: 'plain_text'; content: string }; type: 'default' | 'primary' | 'danger' } {
+    return {
+      tag: 'button',
+      text: {
+        tag: 'plain_text',
+        content: selected ? `${label} Selected` : `${label} Disabled`,
+      },
+      type: selected ? selectedType : 'default',
+    };
+  }
+
+  private permissionActionLabel(action: string): string {
+    switch (action) {
+      case 'allow':
+        return 'Allow';
+      case 'allow_session':
+        return 'Allow Session';
+      case 'deny':
+        return 'Deny';
+      default:
+        return action;
     }
   }
 
