@@ -43,7 +43,7 @@ get_config() { grep "^$1=" "$CONFIG_FILE" 2>/dev/null | head -1 | cut -d= -f2- |
 
 # --- Read runtime setting ---
 CTI_RUNTIME=$(get_config CTI_RUNTIME)
-CTI_RUNTIME="${CTI_RUNTIME:-claude}"
+CTI_RUNTIME="${CTI_RUNTIME:-$DEFAULT_RUNTIME}"
 echo "Runtime: $CTI_RUNTIME"
 echo ""
 
