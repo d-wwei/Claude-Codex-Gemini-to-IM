@@ -142,6 +142,10 @@ case "${1:-help}" in
       exit 1
     fi
 
+    # Source config.env BEFORE clean_env so that CTI_ANTHROPIC_PASSTHROUGH
+    # and other CTI_* flags are available when clean_env checks them.
+    [ -f "$CTI_HOME/config.env" ] && set -a && source "$CTI_HOME/config.env" && set +a
+
     clean_env
     echo "Starting bridge..."
     supervisor_start

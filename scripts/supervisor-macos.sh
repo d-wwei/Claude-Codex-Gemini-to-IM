@@ -54,7 +54,7 @@ build_env_dict() {
   case "$runtime" in
     claude|auto)
       if [ "${CTI_ANTHROPIC_PASSTHROUGH:-}" = "true" ]; then
-        for var in ANTHROPIC_API_KEY ANTHROPIC_BASE_URL; do
+        for var in ANTHROPIC_API_KEY ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN; do
           local val="${!var:-}"
           [ -z "$val" ] && continue
           dict+="${indent}<key>${var}</key>\n${indent}<string>${val}</string>\n"

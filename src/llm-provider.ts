@@ -160,6 +160,7 @@ export function resolveClaudeCliPath(): string | undefined {
         '/opt/homebrew/bin/claude',
         `${process.env.HOME}/.npm-global/bin/claude`,
         `${process.env.HOME}/.local/bin/claude`,
+        `${process.env.HOME}/.claude/local/claude`,
       ];
   for (const p of candidates) {
     if (p && isExecutable(p)) {
