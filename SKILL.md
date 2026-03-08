@@ -1,12 +1,13 @@
 ---
 name: claude-to-im
 description: |
-  This skill bridges the current host coding agent to IM platforms (Telegram, Discord,
-  Feishu/Lark, or QQ). It should be used when the user wants to start a background
-  daemon that forwards IM messages to host agent sessions, or manage that daemon's
-  lifecycle. Trigger on: "claude-to-im", "start bridge", "stop bridge", "bridge status",
-  "查看日志", "启动桥接", "停止桥接", "消息推送", "消息转发", "桥接", "诊断", or
-  any mention of IM bridge management.
+  This skill bridges the current host coding agent to IM platforms (Telegram, Discord, Feishu/Lark, QQ).
+  Use for: setting up, starting, stopping, or diagnosing the IM bridge daemon;
+  forwarding agent replies to a messaging app.
+  Trigger on: "claude-to-im", "start bridge", "stop bridge", "bridge status",
+  "消息推送", "消息转发", "桥接", "连上飞书", "手机上看claude",
+  "启动后台服务", "诊断", "查看日志", "启动桥接", "停止桥接", "配置",
+  or any mention of IM bridge management.
   Subcommands: setup, start, stop, status, logs, reconfigure, doctor.
   Do NOT use for: building standalone bots, webhook integrations, or coding with IM
   platform SDKs — those are regular programming tasks.
@@ -64,7 +65,7 @@ Before running any subcommand other than `setup`, check if `~/.claude-to-im/conf
 
 - **If it does NOT exist:**
   - In interactive hosts: tell the user "No configuration found" and automatically start the `setup` wizard using AskUserQuestion.
-  - In non-interactive hosts: tell the user "No configuration found. Please create `~/.claude-to-im/config.env` based on the example:" then show the contents of `SKILL_DIR/config.env.example` and stop. Do NOT attempt to start the daemon — without config.env the process will crash on startup and may leave behind a stale PID file that blocks future starts.
+  - In non-interactive hosts: tell the user "No configuration found. Please create `~/.claude-to-im/config.env` based on the example:" then show the contents of `SKILL_DIR/config.env.example` and stop. Do NOT attempt to start the daemon — without config.env the process will crash on startup and leave behind a stale PID file that blocks future starts.
 - **If it exists:** proceed with the requested subcommand.
 
 ## Subcommands
