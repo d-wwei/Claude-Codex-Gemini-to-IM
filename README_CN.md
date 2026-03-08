@@ -54,17 +54,37 @@ bash scripts/install-host.sh --host gemini
 - 故障排查参考：[references/troubleshooting.md](references/troubleshooting.md)
 - 安全说明：[SECURITY.md](SECURITY.md)
 
-对于 Codex 变体，也可以在 `~/.codex-to-im/config.env` 中覆盖可执行文件和运行策略：
+## Codex 权限档位
+
+Codex 变体支持通过 `~/.codex-to-im/config.env` 配置运行时权限档位。
+
+默认示例档位：
 
 ```bash
-CTI_CODEX_EXECUTABLE=/Users/you/.local/bin/codex-full
 CTI_CODEX_SANDBOX_MODE=danger-full-access
 CTI_CODEX_APPROVAL_POLICY=never
 ```
 
+可选的包装命令：
+
+```bash
+CTI_CODEX_EXECUTABLE=/Users/you/.local/bin/codex-full
+```
+
+档位说明：
+
+- `full` -> `danger-full-access` + `never`
+- `safe` -> `workspace-write` + `on-request`
+
 这只适合受信任环境。
 
-如果你不想手改配置，也可以使用已安装宿主变体里的 `scripts/permissions.sh`，支持 `show`、`safe`、`full` 三种模式。
+如果你不想手改配置，也可以使用已安装宿主变体里的 `scripts/permissions.sh`：
+
+```bash
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh show
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh safe
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh full
+```
 
 ## 附件支持
 
