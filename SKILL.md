@@ -2,11 +2,15 @@
 name: claude-to-im
 description: |
   This skill bridges the current host coding agent to IM platforms (Telegram, Discord, Feishu/Lark, QQ).
-  It should be used when the user wants to start a background daemon that forwards
-  IM messages to host agent sessions, or manage that daemon's lifecycle.
+  Use for: setting up, starting, stopping, or diagnosing the IM bridge daemon;
+  forwarding agent replies to a messaging app.
   Trigger on: "claude-to-im", "start bridge", "stop bridge", "bridge status",
-  "查看日志", "启动桥接", "停止桥接", or any mention of IM bridge management.
+  "消息推送", "消息转发", "桥接", "连上飞书", "手机上看claude",
+  "启动后台服务", "诊断", "查看日志", "启动桥接", "停止桥接", "配置",
+  or any mention of IM bridge management.
   Subcommands: setup, start, stop, status, logs, reconfigure, doctor.
+  Do NOT use for: building standalone bots, webhook integrations, or coding with IM
+  platform SDKs — those are regular programming tasks.
 argument-hint: "setup | start | stop | status | logs [N] | reconfigure | doctor"
 allowed-tools:
   - Bash
@@ -23,9 +27,8 @@ allowed-tools:
 You are managing the Claude-to-IM bridge.
 User data is stored at `~/.claude-to-im/`.
 
-First, locate the skill directory by finding this SKILL.md file:
-- Use Glob with pattern `**/skills/**/claude-to-im/SKILL.md` to find its path, then derive the skill root directory from it.
-- Store that path mentally as SKILL_DIR for all subsequent file references.
+The skill directory (SKILL_DIR) is at `~/.claude/skills/claude-to-im`.
+If that path doesn't exist, fall back to Glob with pattern `**/skills/**/claude-to-im/SKILL.md` and derive the root from the result.
 
 ## Command parsing
 
@@ -33,17 +36,19 @@ Parse the user's intent from `$ARGUMENTS` into one of these subcommands:
 
 | User says (examples) | Subcommand |
 |---|---|
-| `setup`, `configure`, `配置` | setup |
+| `setup`, `configure`, `配置`, `我想在飞书上用 Claude`, `帮我连接 Telegram` | setup |
 | `start`, `start bridge`, `启动`, `启动桥接` | start |
 | `stop`, `stop bridge`, `停止`, `停止桥接` | stop |
-| `status`, `bridge status`, `状态` | status |
+| `status`, `bridge status`, `状态`, `运行状态`, `怎么看桥接的运行状态` | status |
 | `logs`, `logs 200`, `查看日志`, `查看日志 200` | logs |
-| `reconfigure`, `修改配置` | reconfigure |
-| `doctor`, `diagnose`, `诊断` | doctor |
+| `reconfigure`, `修改配置`, `帮我改一下 token`, `换个 bot` | reconfigure |
+| `doctor`, `diagnose`, `诊断`, `挂了`, `没反应了`, `bot 没反应`, `出问题了` | doctor |
+
+**Disambiguation: `status` vs `doctor`** — Use `status` when the user just wants to check if the bridge is running (informational). Use `doctor` when the user reports a problem or suspects something is broken (diagnostic). When in doubt and the user describes a symptom (e.g., "没反应了", "挂了"), prefer `doctor`.
 
 Extract optional numeric argument for `logs` (default 50).
 
-**IMPORTANT:** Before asking users for any platform credentials, first read `SKILL_DIR/references/setup-guides.md` to get the detailed step-by-step guidance for that platform. Present the relevant guide text to the user via AskUserQuestion so they know exactly what to do.
+Before asking users for any platform credentials, first read `SKILL_DIR/references/setup-guides.md` to get the detailed step-by-step guidance for that platform. Present the relevant guide text to the user via AskUserQuestion — users often don't know where to find bot tokens or app secrets, so showing the guide upfront saves back-and-forth.
 
 ## Runtime detection
 
@@ -60,7 +65,7 @@ Before running any subcommand other than `setup`, check if `~/.claude-to-im/conf
 
 - **If it does NOT exist:**
   - In interactive hosts: tell the user "No configuration found" and automatically start the `setup` wizard using AskUserQuestion.
-  - In non-interactive hosts: tell the user "No configuration found. Please create `~/.claude-to-im/config.env` based on the example:" then show the contents of `SKILL_DIR/config.env.example` and stop. Do NOT attempt to start the daemon.
+  - In non-interactive hosts: tell the user "No configuration found. Please create `~/.claude-to-im/config.env` based on the example:" then show the contents of `SKILL_DIR/config.env.example` and stop. Do NOT attempt to start the daemon — without config.env the process will crash on startup and leave behind a stale PID file that blocks future starts.
 - **If it exists:** proceed with the requested subcommand.
 
 ## Subcommands
@@ -113,17 +118,13 @@ Ask for runtime, default working directory, model, and mode:
 3. Use Bash to create directory structure: `mkdir -p ~/.claude-to-im/{data,logs,runtime,data/messages}`
 4. Use Write to create `~/.claude-to-im/config.env` with all settings in KEY=VALUE format
 5. Use Bash to set permissions: `chmod 600 ~/.claude-to-im/config.env`
-6. Validate tokens:
-   - Telegram: `curl -s "https://api.telegram.org/bot${TOKEN}/getMe"` — check for `"ok":true`
-   - Feishu: `curl -s -X POST "${DOMAIN}/open-apis/auth/v3/tenant_access_token/internal" -H "Content-Type: application/json" -d '{"app_id":"...","app_secret":"..."}'` — check for `"code":0`
-   - Discord: verify token matches format `[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`
-   - QQ: `POST https://bots.qq.com/app/getAppAccessToken` with `{"appId":"...","clientSecret":"..."}` — check for access_token in response; then `GET https://api.sgroup.qq.com/gateway` with `Authorization: QQBot <token>` — check for gateway URL
+6. Validate tokens — read `SKILL_DIR/references/token-validation.md` for the exact commands and expected responses for each platform. This catches typos and wrong credentials before the user tries to start the daemon.
 7. Report results with a summary table. If any validation fails, explain what might be wrong and how to fix it.
 8. On success, tell the user: "Setup complete! Run `/claude-to-im start` to start the bridge."
 
 ### `start`
 
-**Pre-check:** Verify `~/.claude-to-im/config.env` exists (see "Config check" above). Do NOT proceed without it.
+**Pre-check:** Verify `~/.claude-to-im/config.env` exists (see "Config check" above). Without it, the daemon will crash immediately and leave a stale PID file.
 
 Run: `bash "SKILL_DIR/scripts/daemon.sh" start`
 
@@ -163,9 +164,11 @@ Show results and suggest fixes for any failures. Common fixes:
 - dist/daemon.mjs stale → `cd SKILL_DIR && npm run build`
 - Config missing → run `setup`
 
+For more complex issues (messages not received, permission timeouts, high memory, stale PID files), read `SKILL_DIR/references/troubleshooting.md` for detailed diagnosis steps.
+
 ## Notes
 
-- Always mask secrets in output (show only last 4 characters)
-- **Never start the daemon without a valid config.env** — always check first, redirect to setup or show config example
-- The daemon runs as a background Node.js process managed by platform supervisor (launchd on macOS, setsid on Linux, WinSW/NSSM on Windows)
-- Config persists at `~/.claude-to-im/config.env` — survives across sessions
+- Always mask secrets in output (show only last 4 characters) — users often share terminal output in bug reports, so exposed tokens would be a security incident.
+- Always check for config.env before starting the daemon — without it the process crashes on startup and leaves a stale PID file that blocks future starts (requiring manual cleanup).
+- The daemon runs as a background Node.js process managed by platform supervisor (launchd on macOS, setsid on Linux, WinSW/NSSM on Windows).
+- Config persists at `~/.claude-to-im/config.env` — survives across sessions.
