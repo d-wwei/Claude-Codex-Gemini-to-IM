@@ -54,17 +54,37 @@ Each install renders host-specific docs and commands into its own skill director
 - Troubleshooting reference: [references/troubleshooting.md](references/troubleshooting.md)
 - Security model: [SECURITY.md](SECURITY.md)
 
-For Codex variants, you can also override the executable and runtime policy in `~/.codex-to-im/config.env`:
+## Codex Permission Profiles
+
+Codex variants support configurable runtime permission profiles through `~/.codex-to-im/config.env`.
+
+Default example profile:
 
 ```bash
-CTI_CODEX_EXECUTABLE=/Users/you/.local/bin/codex-full
 CTI_CODEX_SANDBOX_MODE=danger-full-access
 CTI_CODEX_APPROVAL_POLICY=never
 ```
 
+Optional wrapper command:
+
+```bash
+CTI_CODEX_EXECUTABLE=/Users/you/.local/bin/codex-full
+```
+
+Profiles:
+
+- `full` -> `danger-full-access` + `never`
+- `safe` -> `workspace-write` + `on-request`
+
 This is intended for trusted environments only.
 
-If you want a simple switch instead of hand-editing config, use the installed host variant's `scripts/permissions.sh` helper with `show`, `safe`, or `full`.
+If you want a simple switch instead of hand-editing config, use the installed host variant's `scripts/permissions.sh` helper:
+
+```bash
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh show
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh safe
+bash ~/.codex/skills/codex-to-im/scripts/permissions.sh full
+```
 
 ## Attachment Support
 

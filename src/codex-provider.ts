@@ -118,6 +118,26 @@ function shouldPassModelToCodex(): boolean {
   return process.env.CTI_CODEX_PASS_MODEL === 'true';
 }
 
+function getCodexPathOverride(): string | undefined {
+  return process.env.CTI_CODEX_EXECUTABLE || undefined;
+}
+
+function getSandboxModeOverride(): 'read-only' | 'workspace-write' | 'danger-full-access' | undefined {
+  const value = process.env.CTI_CODEX_SANDBOX_MODE;
+  if (value === 'read-only' || value === 'workspace-write' || value === 'danger-full-access') {
+    return value;
+  }
+  return undefined;
+}
+
+function getApprovalPolicyOverride(): 'never' | 'on-request' | 'on-failure' | 'untrusted' | undefined {
+  const value = process.env.CTI_CODEX_APPROVAL_POLICY;
+  if (value === 'never' || value === 'on-request' || value === 'on-failure' || value === 'untrusted') {
+    return value;
+  }
+  return undefined;
+}
+
 function looksLikeClaudeModel(model?: string): boolean {
   return !!model && /^claude[-_]/i.test(model);
 }
@@ -166,11 +186,13 @@ export class CodexProvider implements LLMProvider {
       || process.env.OPENAI_API_KEY
       || undefined;
     const baseUrl = process.env.CTI_CODEX_BASE_URL || undefined;
+    const codexPathOverride = getCodexPathOverride();
 
     const CodexClass = this.sdk.Codex;
     this.codex = new CodexClass({
       ...(apiKey ? { apiKey } : {}),
       ...(baseUrl ? { baseUrl } : {}),
+      ...(codexPathOverride ? { codexPathOverride } : {}),
     });
 
     return { sdk: this.sdk, codex: this.codex };
@@ -200,13 +222,16 @@ export class CodexProvider implements LLMProvider {
             }
 
             const approvalPolicy = toApprovalPolicy(params.permissionMode);
+            const approvalPolicyOverride = getApprovalPolicyOverride();
+            const sandboxModeOverride = getSandboxModeOverride();
             const passModel = shouldPassModelToCodex();
 
             const threadOptions: Record<string, unknown> = {
               ...(passModel && params.model ? { model: params.model } : {}),
               ...(params.workingDirectory ? { workingDirectory: params.workingDirectory } : {}),
               skipGitRepoCheck: self.skipGitRepoCheck,
-              approvalPolicy,
+              approvalPolicy: approvalPolicyOverride || approvalPolicy,
+              ...(sandboxModeOverride ? { sandboxMode: sandboxModeOverride } : {}),
             };
 
             // Codex SDK supports text and local images only. For non-image

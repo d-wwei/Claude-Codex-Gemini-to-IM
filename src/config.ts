@@ -10,6 +10,9 @@ export interface Config {
   defaultModel?: string;
   defaultMode: string;
   codexSkipGitRepoCheck?: boolean;
+  codexExecutable?: string;
+  codexSandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  codexApprovalPolicy?: 'never' | 'on-request' | 'on-failure' | 'untrusted';
   geminiApiKey?: string;
   googleApiKey?: string;
   // Telegram
@@ -98,6 +101,9 @@ export function loadConfig(): Config {
     defaultModel: env.get("CTI_DEFAULT_MODEL") || undefined,
     defaultMode: env.get("CTI_DEFAULT_MODE") || "code",
     codexSkipGitRepoCheck: env.get("CTI_CODEX_SKIP_GIT_REPO_CHECK") !== "false",
+    codexExecutable: env.get("CTI_CODEX_EXECUTABLE") || undefined,
+    codexSandboxMode: env.get("CTI_CODEX_SANDBOX_MODE") as Config["codexSandboxMode"] || undefined,
+    codexApprovalPolicy: env.get("CTI_CODEX_APPROVAL_POLICY") as Config["codexApprovalPolicy"] || undefined,
     geminiApiKey: env.get("CTI_GEMINI_API_KEY") || undefined,
     googleApiKey: env.get("CTI_GOOGLE_API_KEY") || undefined,
     tgBotToken: env.get("CTI_TG_BOT_TOKEN") || undefined,
@@ -136,6 +142,9 @@ export function saveConfig(config: Config): void {
     "CTI_CODEX_SKIP_GIT_REPO_CHECK",
     config.codexSkipGitRepoCheck === false ? "false" : "true"
   );
+  out += formatEnvLine("CTI_CODEX_EXECUTABLE", config.codexExecutable);
+  out += formatEnvLine("CTI_CODEX_SANDBOX_MODE", config.codexSandboxMode);
+  out += formatEnvLine("CTI_CODEX_APPROVAL_POLICY", config.codexApprovalPolicy);
   out += formatEnvLine("CTI_GEMINI_API_KEY", config.geminiApiKey);
   out += formatEnvLine("CTI_GOOGLE_API_KEY", config.googleApiKey);
   out += formatEnvLine("CTI_TG_BOT_TOKEN", config.tgBotToken);

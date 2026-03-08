@@ -122,16 +122,23 @@ describe('configToSettings', () => {
 describe('loadConfig/saveConfig round-trip', () => {
   let tmpDir: string;
   let origHome: string;
+  let origCtiHome: string | undefined;
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cti-config-test-'));
     origHome = process.env.HOME || '';
+    origCtiHome = process.env.CTI_HOME;
     // We can't easily override CTI_HOME since it's a const,
     // so we test the parsing logic indirectly through configToSettings
   });
 
   afterEach(() => {
     process.env.HOME = origHome;
+    if (origCtiHome === undefined) {
+      delete process.env.CTI_HOME;
+    } else {
+      process.env.CTI_HOME = origCtiHome;
+    }
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -145,6 +152,27 @@ describe('loadConfig/saveConfig round-trip', () => {
     assert.equal(m.get('bridge_telegram_enabled'), 'false');
     assert.equal(m.get('bridge_discord_enabled'), 'false');
     assert.equal(m.get('bridge_feishu_enabled'), 'false');
+  });
+
+  it('preserves codex execution overrides when saving and loading config', async () => {
+    process.env.CTI_HOME = tmpDir;
+    const mod = await import(`../config.js?roundtrip=${Date.now()}`);
+
+    mod.saveConfig({
+      runtime: 'codex',
+      enabledChannels: ['discord'],
+      defaultWorkDir: '/tmp/project',
+      defaultMode: 'code',
+      codexSkipGitRepoCheck: true,
+      codexExecutable: '/Users/test/.local/bin/codex-full',
+      codexSandboxMode: 'danger-full-access',
+      codexApprovalPolicy: 'never',
+    });
+
+    const loaded = mod.loadConfig();
+    assert.equal(loaded.codexExecutable, '/Users/test/.local/bin/codex-full');
+    assert.equal(loaded.codexSandboxMode, 'danger-full-access');
+    assert.equal(loaded.codexApprovalPolicy, 'never');
   });
 });
 

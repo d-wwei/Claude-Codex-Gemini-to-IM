@@ -361,6 +361,64 @@ describe('CodexProvider', () => {
     }
   });
 
+  it('honors codex executable, sandbox mode, and approval policy overrides', async () => {
+    const oldExecutable = process.env.CTI_CODEX_EXECUTABLE;
+    const oldSandbox = process.env.CTI_CODEX_SANDBOX_MODE;
+    const oldApproval = process.env.CTI_CODEX_APPROVAL_POLICY;
+
+    process.env.CTI_CODEX_EXECUTABLE = '/tmp/codex-full';
+    process.env.CTI_CODEX_SANDBOX_MODE = 'danger-full-access';
+    process.env.CTI_CODEX_APPROVAL_POLICY = 'never';
+
+    try {
+      const { CodexProvider } = await import('../codex-provider.js');
+      const { PendingPermissions } = await import('../permission-gateway.js');
+      const provider = new CodexProvider(new PendingPermissions());
+
+      let capturedStartOptions: Record<string, unknown> | undefined;
+      const mockThread = {
+        runStreamed: () => ({
+          events: (async function* () {
+            yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1, cached_input_tokens: 0 } };
+          })(),
+        }),
+      };
+      (provider as any).ensureSDK = async () => ({
+        sdk: {},
+        codex: {
+          startThread(threadOpts: Record<string, unknown>) {
+            capturedStartOptions = threadOpts;
+            return mockThread;
+          },
+        },
+      });
+
+      await collectStream(provider.streamChat({
+        prompt: 'hello',
+        sessionId: 'override-session',
+      }));
+
+      assert.equal(capturedStartOptions?.sandboxMode, 'danger-full-access');
+      assert.equal(capturedStartOptions?.approvalPolicy, 'never');
+    } finally {
+      if (oldExecutable === undefined) {
+        delete process.env.CTI_CODEX_EXECUTABLE;
+      } else {
+        process.env.CTI_CODEX_EXECUTABLE = oldExecutable;
+      }
+      if (oldSandbox === undefined) {
+        delete process.env.CTI_CODEX_SANDBOX_MODE;
+      } else {
+        process.env.CTI_CODEX_SANDBOX_MODE = oldSandbox;
+      }
+      if (oldApproval === undefined) {
+        delete process.env.CTI_CODEX_APPROVAL_POLICY;
+      } else {
+        process.env.CTI_CODEX_APPROVAL_POLICY = oldApproval;
+      }
+    }
+  });
+
   it('retries with fresh thread when resume fails before any events', async () => {
     const { CodexProvider } = await import('../codex-provider.js');
     const { PendingPermissions } = await import('../permission-gateway.js');
