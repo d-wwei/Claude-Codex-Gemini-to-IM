@@ -8,12 +8,7 @@
 
 Bridge your AI coding assistant (Claude Code / Codex / Gemini) to IM platforms — chat with your AI directly in Feishu/Lark, Discord, or Telegram.
 
-[中文文档](README_CN.md) · [GitHub 仓库](https://github.com/d-wwei/Claude-Codex-Gemini-to-IM) · [故障排查](references/troubleshooting.md) · [安全说明](SECURITY.md)
-
-> **需要桌面 GUI？** 试试 [CodePilot](https://github.com/op7418/CodePilot) —— 可视化聊天、会话管理、文件树预览、权限控制应有尽有。本仓库是轻量 CLI/Skill 版本的 IM 桥接实现。
->
-> **Want a desktop GUI instead?** Check out [CodePilot](https://github.com/op7418/CodePilot) — a desktop app with visual chat, session management, file tree preview, and permission controls. This repository is the lightweight CLI/skill version.
-
+[中文文档](README_CN.md) · [GitHub 仓库](https://github.com/d-wwei/Claude-Codex-Gemini-to-IM) · [故障排查](references/troubleshooting.md) · [安全说明](SECURITY.md）
 ---
 
 ## 功能特性 / Features
