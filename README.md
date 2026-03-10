@@ -1,164 +1,205 @@
 # Claude/Codex/Gemini-to-IM
 
-Bridge AI coding hosts to IM platforms (Telegram, Discord, Feishu/Lark, QQ), with isolated installs for Claude, Codex, Gemini, and future hosts.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![GitHub Stars](https://img.shields.io/github/stars/d-wwei/Claude-Codex-Gemini-to-IM?style=social)](https://github.com/d-wwei/Claude-Codex-Gemini-to-IM)
 
-[中文文档](README_CN.md)
+把 AI 编程助手（Claude Code / Codex / Gemini）桥接到 IM 平台，让你在飞书、Discord、Telegram 里直接与 AI 对话、执行任务。
 
-> **Want a desktop GUI instead?** Check out [CodePilot](https://github.com/op7418/CodePilot) — a desktop app with visual chat, session management, file tree preview, permission controls, and more. This repository contains the lightweight CLI/skill version of the IM bridge.
+Bridge your AI coding assistant (Claude Code / Codex / Gemini) to IM platforms — chat with your AI directly in Feishu/Lark, Discord, or Telegram.
+
+[中文文档](README_CN.md) · [GitHub 仓库](https://github.com/d-wwei/Claude-Codex-Gemini-to-IM) · [故障排查](references/troubleshooting.md) · [安全说明](SECURITY.md)
+
+> **需要桌面 GUI？** 试试 [CodePilot](https://github.com/op7418/CodePilot) —— 可视化聊天、会话管理、文件树预览、权限控制应有尽有。本仓库是轻量 CLI/Skill 版本的 IM 桥接实现。
+>
+> **Want a desktop GUI instead?** Check out [CodePilot](https://github.com/op7418/CodePilot) — a desktop app with visual chat, session management, file tree preview, and permission controls. This repository is the lightweight CLI/skill version.
 
 ---
 
-## What This Repository Provides
+## 功能特性 / Features
 
-- A shared codebase for host-specific skill variants such as `claude-to-im`, `codex-to-im`, and `gemini-to-im`
-- Separate runtime homes for each host, following the pattern `~/.<host>-to-im`
-- Telegram, Discord, Feishu/Lark, and QQ bridge support
-- Background daemon management, permission approval flow, streaming replies, and persisted sessions
-- Consistent attachment handling across runtimes, including non-image files forwarded as local paths when native file input is unavailable
+**核心能力 / Core**
+- 在 IM 消息中直接与 Claude Code / Codex / Gemini 交互
+- 后台 daemon 管理、流式回复、多会话持久化
+- 权限审批流（可设为自动批准）
+- 统一的附件处理：图片、文件均支持，通过本地路径注入兜底
 
-## Host Variants
+**语音能力 / Voice（飞书专属）**
+- 自动转写飞书语音消息（Ogg/Opus → PCM → 飞书 STT）
+- 可选 OpenAI Whisper 作为 STT 备用
+- 可选 ElevenLabs 生成语音回复
 
-| Host | Skill command | Default skill directory | Runtime home |
-|---|---|---|---|
-| Claude | `claude-to-im` | `~/.claude/skills/claude-to-im` | `~/.claude-to-im` |
-| Codex | `codex-to-im` | `~/.codex/skills/codex-to-im` | `~/.codex-to-im` |
-| Gemini | `gemini-to-im` | `~/.gemini/skills/gemini-to-im` | `~/.gemini-to-im` |
+**内建会话管理 / Session Management**
 
-This layout lets you install multiple host variants on the same machine without sharing runtime config, logs, or daemon state.
+| 命令 | 效果 |
+|---|---|
+| `/lsessions` | 列出所有活跃会话 |
+| `/lsessions --all` | 列出全部会话（含已归档） |
+| `/switchto <id\|name>` | 切换到指定会话 |
+| `/rename <name>` | 重命名当前会话 |
+| `/archive [id\|name]` | 归档会话 |
+| `/unarchive <id\|name>` | 恢复归档会话 |
 
-## Installation
+---
 
-Clone the repository once for development:
+## 支持平台 / Supported Platforms
+
+| IM 平台 | 状态 |
+|---|---|
+| Discord | 支持 |
+| 飞书 / Feishu / Lark | 支持（含语音、附件） |
+| Telegram | 支持 |
+| QQ | 支持 |
+
+## 支持的 Runtime
+
+| Runtime | 说明 | 对应 Skill |
+|---|---|---|
+| `claude` | Claude Code CLI（默认） | `claude-to-im` |
+| `codex` | OpenAI Codex CLI | `codex-to-im` |
+| `gemini` | Gemini CLI | `gemini-to-im` |
+| `auto` | 自动探测，优先级：gemini → claude → codex | 任意宿主 |
+
+每个宿主独立隔离，有各自的配置目录：
+
+| 宿主 | Skill 目录 | 运行时目录 |
+|---|---|---|
+| Claude | `~/.claude/skills/claude-to-im` | `~/.claude-to-im` |
+| Codex | `~/.codex/skills/codex-to-im` | `~/.codex-to-im` |
+| Gemini | `~/.gemini/skills/gemini-to-im` | `~/.gemini-to-im` |
+
+---
+
+## 系统要求 / Prerequisites
+
+- **Node.js >= 20**（安装脚本会自动检测）
+- **Git**
+- 至少安装以下之一：
+  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+  - [Codex CLI](https://github.com/openai/codex)
+- 可选：`ffmpeg`（飞书语音转写需要）
+
+---
+
+## 一键安装 / Quick Install
 
 ```bash
-git clone https://github.com/op7418/Claude-to-IM-skill.git ~/code/Claude-to-IM-skill
-cd ~/code/Claude-to-IM-skill
+curl -fsSL https://raw.githubusercontent.com/d-wwei/Claude-Codex-Gemini-to-IM/main/scripts/install.sh | bash
 ```
 
-Then install the host variant you want:
+脚本会自动完成以下操作：
+1. 检测 Node.js 版本（需 >= 20）
+2. 克隆仓库到 `~/.claude/skills/claude-to-im`（已存在则 git pull）
+3. 安装依赖（`npm install`）
+4. 提示你运行 `claude-to-im setup` 完成配置向导
+
+安装完成后，在 Claude Code 中运行：
+```
+/claude-to-im setup
+```
+
+---
+
+## 手动安装 / Manual Install
+
+克隆仓库：
 
 ```bash
+git clone https://github.com/d-wwei/Claude-Codex-Gemini-to-IM.git ~/code/Claude-Codex-Gemini-to-IM
+cd ~/code/Claude-Codex-Gemini-to-IM
+npm install
+```
+
+安装对应宿主变体：
+
+```bash
+# Claude（推荐）
 bash scripts/install-host.sh --host claude
+
+# Codex
 bash scripts/install-host.sh --host codex
+
+# Gemini
 bash scripts/install-host.sh --host gemini
 ```
 
-Each install renders host-specific docs and commands into its own skill directory.
-
-## Documentation
-
-- For Claude-oriented usage, see the installed `claude-to-im` skill docs
-- For Codex-oriented usage, see the installed `codex-to-im` skill docs
-- For Gemini-oriented usage, see the installed `gemini-to-im` skill docs
-- Release notes: [RELEASE_NOTES.md](RELEASE_NOTES.md)
-- Troubleshooting reference: [references/troubleshooting.md](references/troubleshooting.md)
-- Security model: [SECURITY.md](SECURITY.md)
-
-## Codex Permission Profiles
-
-Codex variants support configurable runtime permission profiles through `~/.codex-to-im/config.env`.
-
-Default example profile:
+安装完成后，运行 setup 完成配置：
 
 ```bash
+# Claude Code 中运行
+/claude-to-im setup
+```
+
+---
+
+## 快速配置 / Quick Configuration
+
+Setup 向导会引导你填写：
+- 选择 IM 平台（Discord / 飞书 / Telegram / QQ）
+- 填入 Bot Token 和相关凭据
+- 选择 Runtime（claude / codex / gemini / auto）
+- 设置工作目录和默认模式
+
+配置保存在 `~/.claude-to-im/config.env`（权限 0600）。
+
+详细配置参考：
+- [使用说明](references/usage.md)（安装后可用）
+- [故障排查](references/troubleshooting.md)
+- [安全说明](SECURITY.md)
+
+---
+
+## 常用命令 / Common Commands
+
+以下命令在 Claude Code 中执行（`/claude-to-im <subcommand>`）：
+
+| 命令 | 说明 |
+|---|---|
+| `setup` | 运行配置向导 |
+| `start` | 启动后台桥接 daemon |
+| `stop` | 停止 daemon |
+| `status` | 查看运行状态 |
+| `logs` | 查看最近日志 |
+| `doctor` | 诊断配置和连接问题 |
+| `help` | 查看帮助 |
+
+---
+
+## Codex 权限档位 / Codex Permission Profiles
+
+Codex 变体支持通过 `~/.codex-to-im/config.env` 配置权限档位：
+
+```bash
+# 完全开放（受信任环境）
 CTI_CODEX_SANDBOX_MODE=danger-full-access
 CTI_CODEX_APPROVAL_POLICY=never
+
+# 安全模式
+CTI_CODEX_SANDBOX_MODE=workspace-write
+CTI_CODEX_APPROVAL_POLICY=on-request
 ```
 
-Optional wrapper command:
+快捷切换：
 
 ```bash
-CTI_CODEX_EXECUTABLE=/Users/you/.local/bin/codex-full
-```
-
-Profiles:
-
-- `full` -> `danger-full-access` + `never`
-- `safe` -> `workspace-write` + `on-request`
-
-This is intended for trusted environments only.
-
-If you want a simple switch instead of hand-editing config, use the installed host variant's `scripts/permissions.sh` helper:
-
-```bash
-bash ~/.codex/skills/codex-to-im/scripts/permissions.sh show
 bash ~/.codex/skills/codex-to-im/scripts/permissions.sh safe
 bash ~/.codex/skills/codex-to-im/scripts/permissions.sh full
 ```
 
-## Attachment Support
+---
 
-- Feishu/Lark inbound messages can carry images and regular file attachments into the bridge.
-- Gemini already persists attachments to local temp files and passes those paths into the CLI prompt.
-- Codex and Claude Code now persist all inbound attachments to local temp files and reference those absolute paths in the prompt as a universal fallback.
-- Image attachments still use native multi-modal input where the target runtime supports it, so runtimes that understand images get both the native image input and the local-path fallback.
-- This matters most for Claude-compatible runtimes behind custom gateways or enterprise model adapters: even if native image blocks are ignored, the agent can still open the saved local file path.
+## 可选依赖 / Optional Dependencies
 
-## Voice and Audio
-
-- Feishu inbound audio messages are handled at the bridge layer, not delegated to the runtime as opaque files.
-- The bridge downloads the audio, transcodes Ogg/Opus input to 16 kHz PCM when needed, and calls Feishu STT before the message reaches Codex, Claude, or Gemini.
-- If Feishu STT is rate-limited or unavailable, the bridge can optionally fall back to OpenAI Whisper transcription when `CTI_OPENAI_API_KEY` is configured.
-- When the user explicitly asks for a voice reply, the bridge can optionally generate an ElevenLabs TTS audio reply and send it back as a Feishu file attachment.
-
-## Dependencies and Provider Keys
-
-Required or recommended dependencies:
-
-- `ffmpeg`
-  Used for Feishu voice-message transcoding, especially Ogg/Opus to 16 kHz PCM.
-- Feishu app permission `speech_to_text:speech`
-  Required if you want bridge-side Feishu audio transcription.
-
-Optional provider API keys:
-
-- `CTI_OPENAI_API_KEY`
-  Enables OpenAI Whisper fallback for inbound audio transcription when Feishu STT fails or is rate-limited.
-- `CTI_ELEVENLABS_API_KEY`
-  Enables ElevenLabs voice replies when the user explicitly asks for audio output.
-- `CTI_ELEVENLABS_VOICE_ID`
-  Required together with the ElevenLabs API key.
-- `CTI_ELEVENLABS_MODEL_ID`
-  Optional. Defaults to `eleven_multilingual_v2`.
-
-Relevant config fields in `~/.<host>-to-im/config.env`:
-
-```bash
-CTI_FEISHU_AUDIO_TRANSCRIBE=true
-CTI_AUDIO_TRANSCODER=/opt/homebrew/bin/ffmpeg
-CTI_OPENAI_API_KEY=...
-CTI_ELEVENLABS_API_KEY=...
-CTI_ELEVENLABS_VOICE_ID=...
-CTI_ELEVENLABS_MODEL_ID=eleven_multilingual_v2
-```
-
-Privacy and security guidance:
-
-- Do not send provider API keys through IM chats. Store them only in the local `config.env`.
-- The bridge writes `config.env` with mode `0600`; treat that as baseline protection, not full secret management.
-- If you enable `CTI_OPENAI_API_KEY`, fallback transcription sends audio to OpenAI for processing. Only enable it if that matches your privacy requirements.
-- If you enable ElevenLabs replies, outbound reply text is sent to ElevenLabs when a user explicitly requests voice output.
-- For stronger local protection, prefer disk encryption such as FileVault and rotate leaked provider keys immediately.
-
-## Built-in Session Management Commands
-
-The bridge now includes cross-host session management commands at the bridge layer. They work the same way for Claude, Codex, and Gemini variants because they are handled before a message is forwarded to the underlying agent.
-
-| Command | Effect |
+| 功能 | 依赖 |
 |---|---|
-| `/lsessions` | List active bridge sessions with name, short ID, channel, status, last activity, and summary |
-| `/lsessions --all` | Include archived sessions in the list |
-| `/switchto <session_id\|name>` | Switch the current IM chat to an existing session by ID or assigned name |
-| `/rename <new_name>` | Rename the current session |
-| `/archive [session_id\|name]` | Archive the current or specified session and keep a short summary |
-| `/unarchive <session_id\|name>` | Restore an archived session to the active list |
+| 飞书语音转写 | `ffmpeg` + 飞书 `speech_to_text:speech` 权限 |
+| OpenAI Whisper 备用 STT | `CTI_OPENAI_API_KEY` |
+| ElevenLabs 语音回复 | `CTI_ELEVENLABS_API_KEY` + `CTI_ELEVENLABS_VOICE_ID` |
 
-Implementation notes:
-- Session names, archive state, summaries, and last activity are persisted in `~/.<host>-to-im/data/session-meta.json`
-- Archiving the current session automatically creates a fresh session for the current chat, so new messages do not continue writing into the archived task
-- Existing bridge commands such as `/new`, `/bind`, `/status`, `/cwd`, `/mode`, `/stop`, and `/help` remain available
+---
 
-## Development
+## 开发 / Development
 
 ```bash
 npm install
@@ -166,12 +207,14 @@ npm test
 npm run build
 ```
 
-To refresh the repository homepage after editing these repo-level templates:
+重新渲染仓库首页：
 
 ```bash
 node scripts/render-host-templates.mjs --repo-home --target .
 ```
 
-## License
+---
+
+## 许可证 / License
 
 [MIT](LICENSE)
