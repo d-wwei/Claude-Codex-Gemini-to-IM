@@ -1,5 +1,5 @@
 import { CONFIG_PATH } from "./config.js";
-import { getBridgeContext } from "claude-to-im/src/lib/bridge/context.js";
+import { getBridgeContext } from "./bridge-runtime.js";
 
 const ELEVENLABS_BASE_URL = "https://api.elevenlabs.io";
 const ELEVENLABS_DEFAULT_MODEL = "eleven_multilingual_v2";

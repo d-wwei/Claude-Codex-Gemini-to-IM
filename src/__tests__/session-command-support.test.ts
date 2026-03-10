@@ -2,7 +2,7 @@ import { beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { initBridgeContext } from 'claude-to-im/src/lib/bridge/context.js';
+import { initBridgeContext } from '../bridge-runtime.js';
 import { CTI_HOME } from '../config.js';
 import { JsonFileStore } from '../store.js';
 import { tryHandleSessionManagementCommand } from '../session-command-support.js';

@@ -1,8 +1,6 @@
-import type { BridgeStore, BridgeSession } from 'claude-to-im/src/lib/bridge/host.js';
-import type { ChannelAddress, ChannelBinding } from 'claude-to-im/src/lib/bridge/types.js';
-import * as router from 'claude-to-im/src/lib/bridge/channel-router.js';
-import { getBridgeContext } from 'claude-to-im/src/lib/bridge/context.js';
-import { escapeHtml } from 'claude-to-im/src/lib/bridge/adapters/telegram-utils.js';
+import type { BridgeStore, BridgeSession } from 'claude-to-im/dist/lib/bridge/host.js';
+import type { ChannelAddress, ChannelBinding } from 'claude-to-im/dist/lib/bridge/types.js';
+import { router, getBridgeContext, escapeHtml } from './bridge-runtime.js';
 import type { SessionMeta, SessionRecord } from './store.js';
 
 interface ExtendedStore extends BridgeStore {

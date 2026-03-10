@@ -205,13 +205,11 @@ describe('handleMessage state tracking', () => {
 
     handleMessage({
       type: 'assistant',
-      message: { content: [{ type: 'text', text: 'org has no access' }] },
+      message: { content: [{ type: 'text', text: 'Your organization does not have access to Claude' }] },
     } as any, controller, state);
 
-    assert.equal(state.lastAssistantText, 'org has no access');
+    assert.equal(state.lastAssistantText, 'Your organization does not have access to Claude');
     // No text SSE should be emitted — only tool_use blocks get forwarded
-    const textEvents = chunks.filter(c => c.includes('"type":"text"') || c.includes('"type":"text"'));
-    // Parse more carefully
     const hasTextEvent = chunks.some(c => {
       try { const d = JSON.parse(c.replace('data: ', '')); return d.type === 'text'; }
       catch { return false; }
@@ -263,8 +261,9 @@ describe('handleMessage state tracking', () => {
     } as any, controller, state);
 
     assert.equal(state.lastAssistantText, 'Let me check');
-    assert.equal(chunks.length, 1); // only tool_use, no text
-    assert.ok(chunks[0].includes('tool_use'));
+    assert.equal(chunks.length, 2);
+    assert.ok(chunks[0].includes('text'));
+    assert.ok(chunks[1].includes('tool_use'));
   });
 });
 
