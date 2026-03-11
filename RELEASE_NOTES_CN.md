@@ -1,5 +1,18 @@
 # 发布说明
 
+## 2026-03-11
+
+### 本地配置 include
+
+- `config.env` 现在真正支持本地 env include 写法，例如 `[ -f "$HOME/.codex-to-im/openai.local.env" ] && source "$HOME/.codex-to-im/openai.local.env"`。
+- bridge 的配置加载器现在会递归解析被 include 的 env 文件，而不再只读取主配置中的 `KEY=VALUE` 行。
+- 保存配置时也会保留本地 secrets include 片段，避免后续重新配置时悄悄破坏 OpenAI Whisper fallback 或 ElevenLabs 语音回复配置。
+
+### 对用户的影响
+
+- 现在可以把 OpenAI Whisper fallback 和 ElevenLabs 语音回复的密钥继续放在本地 secrets 文件里，而不用再把 API key 拷回主 `config.env`。
+- 之前依赖文档里 include 写法的现有配置，在重启 bridge 后会按文档预期正常工作。
+
 ## 2026-03-08
 
 ### 文件附件处理
