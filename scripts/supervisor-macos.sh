@@ -97,7 +97,7 @@ generate_plist() {
     <string>${LOG_FILE}</string>
 
     <key>RunAtLoad</key>
-    <false/>
+    <true/>
 
     <key>KeepAlive</key>
     <dict>
