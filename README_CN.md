@@ -193,6 +193,7 @@ Bridge 还内建了一组可在 IM 聊天中直接使用的会话管理命令：
 ```
 ~/.<host>-to-im/
 ├── config.env             ← 凭据与配置 (chmod 600)
+├── openai.local.env       ← 可选的本地 include secrets 文件 (chmod 600)
 ├── data/                  ← 持久化 JSON 存储
 │   ├── sessions.json
 │   ├── bindings.json
@@ -266,6 +267,7 @@ Codex runtime：
 ## 安全
 
 - 所有凭据存储在 `~/.codex-to-im/config.env`，权限 `chmod 600`
+- `config.env` 也可以按 include 方式引用本地 secrets 文件，例如 `~/.codex-to-im/openai.local.env`；现在加载配置时会真正解析这层 include
 - 日志输出中 token 自动脱敏（基于正则匹配）
 - 允许用户/频道/服务器列表限制谁可以与机器人交互
 - 守护进程是本地进程，没有入站网络监听

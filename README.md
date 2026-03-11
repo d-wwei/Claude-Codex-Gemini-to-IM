@@ -193,6 +193,7 @@ The `setup` wizard provides inline guidance for every step. Here's a summary:
 ```
 ~/.<host>-to-im/
 ├── config.env             ← Credentials & settings (chmod 600)
+├── openai.local.env       ← Optional locally included secrets (chmod 600)
 ├── data/                  ← Persistent JSON storage
 │   ├── sessions.json
 │   ├── bindings.json
@@ -266,6 +267,7 @@ See [references/troubleshooting.md](references/troubleshooting.md) for more deta
 ## Security
 
 - All credentials stored in `~/.codex-to-im/config.env` with `chmod 600`
+- `config.env` can optionally include a local secrets file such as `~/.codex-to-im/openai.local.env`; the loader now resolves that include when reading config
 - Tokens are automatically redacted in all log output (pattern-based masking)
 - Allowed user/channel/guild lists restrict who can interact with the bot
 - The daemon is a local process with no inbound network listeners
