@@ -483,6 +483,21 @@ const SUPPORTED_IMAGE_TYPES = new Set<string>([
   'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp',
 ]);
 
+/**
+ * Detect actual image MIME type from base64 data by inspecting magic bytes.
+ * Falls back to the declared type if detection fails.
+ */
+function detectImageMime(base64Data: string, declaredType: string): ImageMediaType {
+  const header = Buffer.from(base64Data.slice(0, 24), 'base64');
+  if (header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47) return 'image/png';
+  if (header[0] === 0xFF && header[1] === 0xD8 && header[2] === 0xFF) return 'image/jpeg';
+  if (header[0] === 0x47 && header[1] === 0x49 && header[2] === 0x46) return 'image/gif';
+  if (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46 &&
+      header[8] === 0x57 && header[9] === 0x45 && header[10] === 0x42 && header[11] === 0x50) return 'image/webp';
+  const normalized = declaredType === 'image/jpg' ? 'image/jpeg' : declaredType;
+  return (SUPPORTED_IMAGE_TYPES.has(normalized) ? normalized : 'image/png') as ImageMediaType;
+}
+
 const MIME_EXT: Record<string, string> = {
   'image/png': '.png',
   'image/jpeg': '.jpg',
@@ -530,7 +545,8 @@ function writeAttachmentTempFiles(files: FileAttachment[] | undefined): { paths:
 
   for (const file of files) {
     const safeBase = sanitizeAttachmentBaseName(file.name);
-    const ext = getAttachmentExtension(file);
+    const realMime = SUPPORTED_IMAGE_TYPES.has(file.type) ? detectImageMime(file.data, file.type) : file.type;
+    const ext = MIME_EXT[realMime] || getAttachmentExtension(file);
     const filePath = path.join(tmpDir, `${safeBase}${safeBase.endsWith(ext) ? '' : ext}`);
     fs.writeFileSync(filePath, Buffer.from(file.data, 'base64'));
     paths.push(filePath);
@@ -558,23 +574,25 @@ function buildPrompt(
   files?: FileAttachment[],
 ): {
   prompt: string | AsyncIterable<{ type: 'user'; message: { role: 'user'; content: unknown[] }; parent_tool_use_id: null; session_id: string }>;
+  textPrompt: string;
   cleanup: () => void;
 } {
   const { paths: attachmentPaths, cleanup } = writeAttachmentTempFiles(files);
   const promptText = buildPromptWithAttachmentPaths(text, attachmentPaths);
   const imageFiles = files?.filter(f => SUPPORTED_IMAGE_TYPES.has(f.type));
   if (!imageFiles || imageFiles.length === 0) {
-    return { prompt: promptText, cleanup };
+    return { prompt: promptText, textPrompt: promptText, cleanup };
   }
 
   const contentBlocks: unknown[] = [];
 
   for (const file of imageFiles) {
+    const detectedMime = detectImageMime(file.data, file.type);
     contentBlocks.push({
       type: 'image',
       source: {
         type: 'base64',
-        media_type: (file.type === 'image/jpg' ? 'image/jpeg' : file.type) as ImageMediaType,
+        media_type: detectedMime,
         data: file.data,
       },
     });
@@ -593,6 +611,7 @@ function buildPrompt(
 
   return {
     prompt: (async function* () { yield msg; })(),
+    textPrompt: promptText,
     cleanup,
   };
 }
@@ -1039,7 +1058,7 @@ export class SDKLLMProvider implements LLMProvider {
 
             const promptText = typeof promptInput.prompt === 'string'
               ? promptInput.prompt
-              : params.prompt;
+              : promptInput.textPrompt;
 
             await managed.session.send(promptText);
 

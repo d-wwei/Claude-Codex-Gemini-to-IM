@@ -99,6 +99,49 @@ const MIME_BY_TYPE: Record<string, string> = {
   media: 'application/octet-stream',
 };
 
+/**
+ * Detect MIME type from binary magic bytes. Returns null if unrecognized.
+ */
+function detectMimeFromBytes(buf: Buffer): string | null {
+  if (buf.length < 12) return null;
+  // Images
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return 'image/png';
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return 'image/jpeg';
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return 'image/gif';
+  // RIFF container (WebP or WAV)
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) {
+    const fourcc = buf.subarray(8, 12).toString('ascii');
+    if (fourcc === 'WEBP') return 'image/webp';
+    if (fourcc === 'WAVE') return 'audio/wav';
+    if (fourcc === 'AVI ') return 'video/avi';
+  }
+  // OGG (Opus/Vorbis)
+  if (buf[0] === 0x4F && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53) return 'audio/ogg';
+  // MP3 (ID3 tag or sync word)
+  if (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return 'audio/mpeg';
+  if (buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0) return 'audio/mpeg';
+  // FLAC
+  if (buf[0] === 0x66 && buf[1] === 0x4C && buf[2] === 0x61 && buf[3] === 0x43) return 'audio/flac';
+  // PDF
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return 'application/pdf';
+  // ZIP (docx/xlsx/pptx are also ZIP)
+  if (buf[0] === 0x50 && buf[1] === 0x4B && buf[2] === 0x03 && buf[3] === 0x04) return 'application/zip';
+  // MP4 / M4A (ftyp box)
+  if (buf.length >= 8 && buf.subarray(4, 8).toString('ascii') === 'ftyp') {
+    const brand = buf.subarray(8, 12).toString('ascii');
+    if (brand === 'M4A ' || brand === 'M4B ') return 'audio/mp4';
+    return 'video/mp4';
+  }
+  return null;
+}
+
+const MIME_TO_EXT: Record<string, string> = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp',
+  'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/flac': 'flac', 'audio/mp4': 'm4a',
+  'video/mp4': 'mp4', 'video/avi': 'avi',
+  'application/pdf': 'pdf', 'application/zip': 'zip',
+};
+
 type GeneratedVoiceReply = {
   fileName: string;
   mimeType: string;
@@ -1368,7 +1411,7 @@ export class FeishuAdapter extends BaseChannelAdapter {
 
   private transcodeAudioToPcm(bytes: Buffer, attachment: FileAttachment): Buffer | null {
     const explicitTranscoder = getBridgeContext().store.getSetting('bridge_audio_transcoder') || '';
-    const transcoders = explicitTranscoder ? [explicitTranscoder] : ['ffmpeg', '/usr/bin/afconvert'];
+    const transcoders = explicitTranscoder ? [explicitTranscoder] : ['ffmpeg', '/opt/homebrew/bin/ffmpeg', '/usr/bin/afconvert'];
 
     for (const transcoder of transcoders) {
       const trimmed = transcoder.trim();
@@ -1533,13 +1576,13 @@ export class FeishuAdapter extends BaseChannelAdapter {
       }
 
       const base64 = buffer.toString('base64');
-      const mimeType = res.headers?.['content-type'] || MIME_BY_TYPE[resourceType] || 'application/octet-stream';
-      const ext = resourceType === 'image' ? 'png'
-        : resourceType === 'audio' ? 'ogg'
-        : resourceType === 'video' ? 'mp4'
-        : 'bin';
+      const headerMime = res.headers?.['content-type'] || '';
+      const detectedMime = detectMimeFromBytes(buffer);
+      // Prefer magic-bytes detection, then HTTP header, then fallback by resource type
+      const mimeType = detectedMime || (headerMime && !headerMime.includes('octet-stream') ? headerMime : null) || MIME_BY_TYPE[resourceType] || 'application/octet-stream';
+      const ext = MIME_TO_EXT[mimeType] || (resourceType === 'image' ? 'png' : resourceType === 'audio' ? 'ogg' : resourceType === 'video' ? 'mp4' : 'bin');
 
-      console.log(`[feishu-adapter] Resource downloaded: ${buffer.length} bytes, key=${fileKey}`);
+      console.log(`[feishu-adapter] Resource downloaded: ${buffer.length} bytes, key=${fileKey}, mime=${mimeType} (detected=${detectedMime}, header=${headerMime})`);
 
       return {
         id: fileKey,

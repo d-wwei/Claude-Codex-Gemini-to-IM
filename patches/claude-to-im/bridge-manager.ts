@@ -907,7 +907,7 @@ async function handleMessage(
   // Regular message — route to conversation engine
   const binding = router.resolve(msg.address);
   const senderTag = msg.address.userId ? `[sender: ${msg.address.userId}]` : '';
-  const baseText = text || (hasAttachments ? 'Describe this image.' : '');
+  const baseText = text || (hasAttachments ? 'Describe this attachment.' : '');
   const promptText = senderTag ? `${senderTag}\n${baseText}` : baseText;
 
   try {
