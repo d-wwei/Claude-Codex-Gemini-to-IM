@@ -20,7 +20,7 @@ await esbuild.build({
     'stream', 'events', 'url', 'util', 'child_process', 'worker_threads',
     'node:*',
   ],
-  banner: { js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);" },
+  banner: { js: "import { createRequire as __esbuildCreateRequire } from 'module'; const require = __esbuildCreateRequire(import.meta.url);" },
 });
 
 console.log('Built dist/daemon.mjs');

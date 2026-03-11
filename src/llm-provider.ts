@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { execSync, execFileSync } from 'node:child_process';
 import { query, unstable_v2_resumeSession } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKMessage, SDKSession, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
@@ -16,6 +17,7 @@ import type { PendingPermissions } from './permission-gateway.js';
 
 import { sseEvent } from './sse-utils.js';
 
+const nodeRequire = createRequire(import.meta.url);
 // ── Environment isolation ──
 
 /** Env vars always passed through to the CLI subprocess. */
@@ -292,7 +294,7 @@ function findAllInPath(): string[] {
  */
 function sdkCliFallback(): string | undefined {
   try {
-    const sdkMain = require.resolve('@anthropic-ai/claude-agent-sdk');
+    const sdkMain = nodeRequire.resolve('@anthropic-ai/claude-agent-sdk');
     const candidate = path.join(path.dirname(sdkMain), 'cli.js');
     if (isExecutable(candidate)) return candidate;
   } catch {
