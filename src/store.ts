@@ -286,9 +286,12 @@ export class JsonFileStore implements BridgeStore {
     const key = `${data.channelType}:${data.chatId}`;
     const existing = this.bindings.get(key);
     if (existing) {
+      const sessionChanged = existing.codepilotSessionId !== data.codepilotSessionId;
       const updated: ChannelBinding = {
         ...existing,
         codepilotSessionId: data.codepilotSessionId,
+        // A fresh bridge session must not inherit a stale Claude SDK session.
+        sdkSessionId: sessionChanged ? '' : existing.sdkSessionId,
         workingDirectory: data.workingDirectory,
         model: data.model,
         updatedAt: now(),

@@ -88,6 +88,30 @@ describe('JsonFileStore', { concurrency: false }, () => {
     assert.equal(b2.codepilotSessionId, 'sess-2');
   });
 
+  it('upsertChannelBinding clears stale sdkSessionId when session changes', () => {
+    const store = new JsonFileStore(makeSettings());
+    const b1 = store.upsertChannelBinding({
+      channelType: 'telegram',
+      chatId: '123',
+      codepilotSessionId: 'sess-1',
+      workingDirectory: '/tmp',
+      model: 'model-1',
+    });
+    store.updateChannelBinding(b1.id, { sdkSessionId: 'sdk-old' });
+
+    const b2 = store.upsertChannelBinding({
+      channelType: 'telegram',
+      chatId: '123',
+      codepilotSessionId: 'sess-2',
+      workingDirectory: '/tmp/new',
+      model: 'model-2',
+    });
+
+    assert.equal(b2.id, b1.id);
+    assert.equal(b2.codepilotSessionId, 'sess-2');
+    assert.equal(b2.sdkSessionId, '');
+  });
+
   it('upsertChannelBinding uses default mode from settings', () => {
     const settings = makeSettings();
     settings.set('bridge_default_mode', 'plan');

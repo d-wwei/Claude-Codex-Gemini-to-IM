@@ -1004,6 +1004,13 @@ async function handleCommand(
         workDir = validated;
       }
       const binding = router.createBinding(msg.address, workDir);
+      // Force a clean Claude SDK session on /new even if the channel binding
+      // record existed before. This avoids inheriting stale provider context.
+      if (binding.id) {
+        try {
+          store.updateChannelBinding(binding.id, { sdkSessionId: '' });
+        } catch { /* best effort */ }
+      }
       response = `New session created.\nSession: <code>${binding.codepilotSessionId.slice(0, 8)}...</code>\nCWD: <code>${escapeHtml(binding.workingDirectory || '~')}</code>`;
       break;
     }
