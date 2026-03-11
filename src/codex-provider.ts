@@ -30,6 +30,7 @@ const MIME_EXT: Record<string, string> = {
 
 const DEFAULT_TURN_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+const DEFAULT_START_TIMEOUT_MS = 5 * 60 * 1000;
 
 function parsePositiveIntEnv(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -44,6 +45,10 @@ function getCodexTurnTimeoutMs(): number {
 
 function getCodexIdleTimeoutMs(): number {
   return parsePositiveIntEnv('CTI_CODEX_IDLE_TIMEOUT_MS', DEFAULT_IDLE_TIMEOUT_MS);
+}
+
+function getCodexStartTimeoutMs(): number {
+  return parsePositiveIntEnv('CTI_CODEX_START_TIMEOUT_MS', DEFAULT_START_TIMEOUT_MS);
 }
 
 function makeAbortError(message: string): Error {
@@ -309,6 +314,7 @@ export class CodexProvider implements LLMProvider {
           const turnAbort = new AbortController();
           const turnTimeoutMs = getCodexTurnTimeoutMs();
           const idleTimeoutMs = getCodexIdleTimeoutMs();
+          const startTimeoutMs = getCodexStartTimeoutMs();
           let abortReason: string | null = null;
           let turnTimer: ReturnType<typeof setTimeout> | null = null;
           let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -331,13 +337,11 @@ export class CodexProvider implements LLMProvider {
             turnAbort.abort(makeAbortError(message));
           };
 
-          const armIdleTimer = () => {
+          const armIdleTimer = (timeoutMs: number, message: string) => {
             if (idleTimer) clearTimeout(idleTimer);
             idleTimer = setTimeout(() => {
-              abortTurn(
-                `Codex request stalled for ${Math.round(idleTimeoutMs / 1000)}s without streaming progress`,
-              );
-            }, idleTimeoutMs);
+              abortTurn(message);
+            }, timeoutMs);
             idleTimer.unref?.();
           };
 
@@ -358,7 +362,6 @@ export class CodexProvider implements LLMProvider {
               );
             }, turnTimeoutMs);
             turnTimer.unref?.();
-            armIdleTimer();
           }
 
           try {
@@ -392,6 +395,10 @@ export class CodexProvider implements LLMProvider {
             };
 
             await self.requestTurnApproval(controller, params, effectiveApprovalPolicy);
+            armIdleTimer(
+              startTimeoutMs,
+              `Codex request stalled for ${Math.round(startTimeoutMs / 1000)}s before first streaming event`,
+            );
 
             // Codex SDK supports text and local images only. For non-image
             // attachments, persist them locally and reference their paths in
@@ -425,7 +432,10 @@ export class CodexProvider implements LLMProvider {
 
                 for await (const event of events) {
                   sawAnyEvent = true;
-                  armIdleTimer();
+                  armIdleTimer(
+                    idleTimeoutMs,
+                    `Codex request stalled for ${Math.round(idleTimeoutMs / 1000)}s without streaming progress`,
+                  );
 
                   switch (event.type) {
                     case 'thread.started': {
