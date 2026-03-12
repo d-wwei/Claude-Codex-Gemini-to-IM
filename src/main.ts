@@ -225,6 +225,77 @@ async function main(): Promise<void> {
     console.log(`[${LOG_PREFIX}] exit (code: ${code})`);
   });
 
+  // ── Connection liveness probe ──
+  // The Feishu SDK's built-in WSClient reconnection can silently stall:
+  // the process stays alive but the WS never reconnects, creating a dead
+  // zone where launchd thinks everything is fine but no messages arrive.
+  //
+  // This probe calls a lightweight Feishu API (bot info) every 3 minutes.
+  // If it fails 3 consecutive times (~9 min), we exit so launchd restarts us.
+  const PROBE_INTERVAL_MS = 3 * 60 * 1000;      // 3 minutes
+  const PROBE_MAX_FAILURES = 3;                   // exit after 3 consecutive failures
+  const PROBE_TIMEOUT_MS = 15_000;                // 15s per probe request
+  let probeConsecutiveFailures = 0;
+
+  if (config.enabledChannels.includes('feishu')) {
+    const feishuAppId = process.env.CTI_FEISHU_APP_ID;
+    const feishuAppSecret = process.env.CTI_FEISHU_APP_SECRET;
+    const feishuDomain = process.env.CTI_FEISHU_DOMAIN || 'https://open.feishu.cn';
+
+    if (feishuAppId && feishuAppSecret) {
+      setInterval(async () => {
+        if (shuttingDown) return;
+        try {
+          // Step 1: get tenant_access_token
+          const tokenCtrl = new AbortController();
+          const tokenTimer = setTimeout(() => tokenCtrl.abort(), PROBE_TIMEOUT_MS);
+          const tokenRes = await fetch(`${feishuDomain}/open-apis/auth/v3/tenant_access_token/internal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ app_id: feishuAppId, app_secret: feishuAppSecret }),
+            signal: tokenCtrl.signal,
+          });
+          clearTimeout(tokenTimer);
+          const tokenData = await tokenRes.json() as { code?: number; tenant_access_token?: string };
+          if (tokenData.code !== 0 || !tokenData.tenant_access_token) {
+            throw new Error(`token API returned code ${tokenData.code}`);
+          }
+
+          // Step 2: call bot info endpoint to verify connectivity
+          const botCtrl = new AbortController();
+          const botTimer = setTimeout(() => botCtrl.abort(), PROBE_TIMEOUT_MS);
+          const botRes = await fetch(`${feishuDomain}/open-apis/bot/v3/info`, {
+            headers: { Authorization: `Bearer ${tokenData.tenant_access_token}` },
+            signal: botCtrl.signal,
+          });
+          clearTimeout(botTimer);
+          const botData = await botRes.json() as { code?: number };
+          if (botData.code !== 0) {
+            throw new Error(`bot info API returned code ${botData.code}`);
+          }
+
+          // Success — reset failure counter
+          if (probeConsecutiveFailures > 0) {
+            console.log(`[${LOG_PREFIX}] Liveness probe recovered after ${probeConsecutiveFailures} failure(s)`);
+          }
+          probeConsecutiveFailures = 0;
+        } catch (err) {
+          probeConsecutiveFailures++;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[${LOG_PREFIX}] Liveness probe failed (${probeConsecutiveFailures}/${PROBE_MAX_FAILURES}): ${errMsg}`);
+
+          if (probeConsecutiveFailures >= PROBE_MAX_FAILURES) {
+            console.error(`[${LOG_PREFIX}] Liveness probe exceeded max failures — exiting for launchd restart`);
+            writeStatus({ running: false, lastExitReason: `liveness_probe_failed: ${probeConsecutiveFailures} consecutive failures` });
+            process.exit(1);
+          }
+        }
+      }, PROBE_INTERVAL_MS);
+
+      console.log(`[${LOG_PREFIX}] Liveness probe enabled (interval: ${PROBE_INTERVAL_MS / 1000}s, max failures: ${PROBE_MAX_FAILURES})`);
+    }
+  }
+
   // ── Heartbeat to keep event loop alive ──
   // setInterval is ref'd by default, preventing Node from exiting
   // when the event loop would otherwise be empty.
