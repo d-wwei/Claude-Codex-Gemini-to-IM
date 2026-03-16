@@ -107,65 +107,93 @@ Enter comma-separated IDs. Leave empty to allow all servers the bot is in.
    - **App ID** (like `cli_xxxxxxxxxx`)
    - **App Secret** (click to reveal, like `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`)
 
-### Step A — Batch-add required permissions
+### Phase 1: Permissions + Bot capability
+
+> Complete Phase 1 and publish before moving to Phase 2. Feishu requires a published version for permissions to take effect, and the bridge service needs active permissions to establish its WebSocket connection.
+
+**Step A — Batch-add required permissions**
 
 1. On the app page, go to **"Permissions & Scopes"**
-2. Instead of adding permissions one by one, use **batch configuration**: click the **"Batch switch to configure by dependency"** link (or find the JSON editor)
-3. Paste the following JSON to add all required permissions at once:
+2. Use **batch configuration** (click **"Batch switch to configure by dependency"** or find the JSON editor)
+3. Paste the following JSON (required for streaming cards and interactive buttons):
 
 ```json
 {
   "scopes": {
     "tenant": [
-      "aily:file:read",
-      "aily:file:write",
-      "application:application.app_message_stats.overview:readonly",
-      "application:application:self_manage",
-      "application:bot.menu:write",
-      "contact:user.employee_id:readonly",
-      "corehr:file:download",
-      "event:ip_list",
-      "im:chat.access_event.bot_p2p_chat:read",
-      "im:chat.members:bot_access",
-      "im:message",
-      "im:message.group_at_msg:readonly",
-      "im:message.p2p_msg:readonly",
-      "im:message:readonly",
       "im:message:send_as_bot",
-      "im:resource"
+      "im:message:readonly",
+      "im:message.p2p_msg:readonly",
+      "im:message.group_at_msg:readonly",
+      "im:message:update",
+      "im:message.reactions:read",
+      "im:message.reactions:write_only",
+      "im:chat:read",
+      "im:resource",
+      "cardkit:card:write",
+      "cardkit:card:read"
     ],
-    "user": [
-      "aily:file:read",
-      "aily:file:write",
-      "im:chat.access_event.bot_p2p_chat:read"
-    ]
+    "user": []
   }
 }
 ```
 
 4. Click **"Save"** to apply all permissions
 
-### Step B — Enable the bot
+If the batch import UI is not available, add each scope manually via the search box.
+
+**Step B — Enable the bot**
 
 1. Go to **"Add Features"** → enable **"Bot"**
 2. Set the bot name and description
 
-### Step C — Configure Events & Callbacks (long connection)
+**Step C — First publish (makes permissions + bot effective)**
+
+1. Go to **"Version Management & Release"** → click **"Create Version"**
+2. Fill in version `1.0.0` and a description → click **"Save"** → **"Submit for Review"**
+3. Admin approves in **Feishu Admin Console** → **App Review** (self-approve if you are the admin)
+
+**The bot will NOT work until this version is approved.**
+
+### Phase 2: Event subscription (requires running bridge)
+
+> The bridge service must be running before configuring events. Feishu validates the WebSocket connection when saving event subscription — if the bridge is not running, you'll get "未检测到应用连接信息" (connection not detected) error.
+
+**Step D — Start the bridge service**
+
+Run `/claude-to-im start` in Claude Code. This establishes the WebSocket long connection that Feishu needs to detect.
+
+**Step E — Configure Events & Callbacks (long connection)**
 
 1. Go to **"Events & Callbacks"** in the left sidebar
 2. Under **"Event Dispatch Method"**, select **"Long Connection"** (长连接 / WebSocket mode)
-3. Click **"Add Event"** and add these events:
+3. Click **"Add Event"** and add:
    - `im.message.receive_v1` — Receive messages
-   - `p2p_chat_create` — Bot added to chat (optional but recommended)
-4. Click **"Save"**
+4. Click **"Add Callback"** and add:
+   - `card.action.trigger` — Card interaction callback (for permission approval buttons)
+5. Click **"Save"**
 
-### Step D — Publish the app
+**Step F — Second publish (makes event subscription effective)**
 
 1. Go to **"Version Management & Release"** → click **"Create Version"**
-2. Fill in version number and update description → click **"Save"**
-3. Click **"Submit for Review"**
-4. For personal/test use, the admin can approve it directly in the **Feishu Admin Console** → **App Review**
-5. **Important:** The bot will NOT respond to messages until the version is approved and published
+2. Fill in version `1.1.0` → **"Save"** → **"Submit for Review"** → Admin approves
+3. After approval, the bot can receive and respond to messages
+
+> **Ongoing rule:** Any change to permissions, events, or capabilities requires a new version publish + admin approval.
+
+### Upgrading from a previous version
+
+If you already have a Feishu app configured, you need to:
+
+1. **Add new permissions**: Go to Permissions & Scopes, add these scopes:
+   - `cardkit:card:write`, `cardkit:card:read` — Streaming cards
+   - `im:message:update` — Real-time card content updates
+   - `im:message.reactions:read`, `im:message.reactions:write_only` — Typing indicator
+2. **Publish a new version** — Permission changes only take effect after a new version is approved
+3. **Start (or restart) the bridge** — Run `/claude-to-im start` so the WebSocket connection is active
+4. **Add callback**: Go to Events & Callbacks, add `card.action.trigger` callback (card interaction for permission buttons). This step requires the bridge to be running — Feishu validates the WebSocket connection when saving.
+5. **Publish again** — The new callback requires another version publish + admin approval
+6. **Restart the bridge** — Run `/claude-to-im stop` then `/claude-to-im start` to pick up the new capabilities
 
 ### Domain (optional)
 

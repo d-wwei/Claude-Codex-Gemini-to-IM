@@ -49,7 +49,7 @@ Parse the user's intent from `$ARGUMENTS` into one of these subcommands:
 
 Extract optional numeric argument for `logs` (default 50).
 
-Before asking users for any platform credentials, first read `SKILL_DIR/references/setup-guides.md` to get the detailed step-by-step guidance for that platform. Present the relevant guide text to the user via AskUserQuestion — users often don't know where to find bot tokens or app secrets, so showing the guide upfront saves back-and-forth.
+Before asking users for any platform credentials, read `SKILL_DIR/references/setup-guides.md` internally so you know where to find each credential. Do NOT dump the full guide to the user upfront — only mention the specific next step they need to do (e.g., "Go to https://open.feishu.cn → your app → Credentials to find the App ID"). If the user says they don't know how, then show the relevant section of the guide.
 
 ## Runtime detection
 
@@ -82,16 +82,20 @@ When AskUserQuestion IS available, collect input **one field at a time**. After 
 Ask which channels to enable (telegram, discord, feishu, qq). Accept comma-separated input. Briefly describe each:
 - **telegram** — Best for personal use. Streaming preview, inline permission buttons.
 - **discord** — Good for team use. Server/channel/user-level access control.
-- **feishu** (Lark) — For Feishu/Lark teams. Event-based messaging.
+- **feishu** (Lark) — For Feishu/Lark teams. Streaming cards, tool progress, inline permission buttons.
 - **qq** — QQ C2C private chat only. No inline permission buttons, no streaming preview. Permissions use text `/perm ...` commands.
 
 **Step 2 — Collect tokens per channel**
 
-For each enabled channel, read `SKILL_DIR/references/setup-guides.md` and present the relevant platform guide to the user. Collect one credential at a time:
+For each enabled channel, collect one credential at a time. Tell the user where to find each value in one sentence. Only show the full guide section (from `SKILL_DIR/references/setup-guides.md`) if the user asks for help or says they don't know how:
 
 - **Telegram**: Bot Token → confirm (masked) → Chat ID (see guide for how to get it) → confirm → Allowed User IDs (optional). **Important:** At least one of Chat ID or Allowed User IDs must be set, otherwise the bot will reject all messages.
 - **Discord**: Bot Token → confirm (masked) → Allowed User IDs → Allowed Channel IDs (optional) → Allowed Guild IDs (optional). **Important:** At least one of Allowed User IDs or Allowed Channel IDs must be set, otherwise the bot will reject all messages (default-deny).
-- **Feishu**: App ID → confirm → App Secret → confirm (masked) → Domain (optional) → Allowed User IDs (optional). Guide through all 4 steps (A: batch permissions, B: enable bot, C: events & callbacks with long connection, D: publish version).
+- **Feishu**: App ID → confirm → App Secret → confirm (masked) → Domain (optional) → Allowed User IDs (optional). After collecting credentials, explain the two-phase setup the user must complete:
+  - **Phase 1** (before starting bridge): (A) batch-add permissions, (B) enable bot capability, (C) publish first version + admin approve. This makes permissions and bot effective.
+  - **Phase 2** (requires running bridge): (D) run `/claude-to-im start`, (E) configure events (`im.message.receive_v1`) and callback (`card.action.trigger`) with long connection mode, (F) publish second version + admin approve.
+  - **Why two phases:** Feishu validates WebSocket connection when saving event subscription — if the bridge isn't running, saving will fail. The bridge needs published permissions to connect.
+  - Keep this to a short checklist — show the full guide only if asked.
 - **QQ**: Collect two required fields, then optional ones:
   1. QQ App ID (required) → confirm
   2. QQ App Secret (required) → confirm (masked)
@@ -152,7 +156,7 @@ Run: `bash "SKILL_DIR/scripts/daemon.sh" logs N`
 1. Read current config from `~/.link-to-im/config.env`
 2. Show current settings in a clear table format, with all secrets masked (only last 4 chars visible)
 3. Use AskUserQuestion to ask what the user wants to change
-4. When collecting new values, read `SKILL_DIR/references/setup-guides.md` and present the relevant guide for that field
+4. When collecting new values, tell the user where to find the value; only show the full guide from `SKILL_DIR/references/setup-guides.md` if they ask for help
 5. Update the config file atomically (write to tmp, rename)
 6. Re-validate any changed tokens
 7. Remind user: "Run `/link-to-im stop` then `/link-to-im start` to apply the changes."
@@ -167,6 +171,8 @@ Show results and suggest fixes for any failures. Common fixes:
 - Config missing → run `setup`
 
 For more complex issues (messages not received, permission timeouts, high memory, stale PID files), read `SKILL_DIR/references/troubleshooting.md` for detailed diagnosis steps.
+
+**Feishu upgrade note:** If the user upgraded from an older version of this skill and Feishu is returning permission errors (e.g. streaming cards not working, typing indicators failing, permission buttons unresponsive), the root cause is almost certainly missing permissions or callbacks in the Feishu backend. Refer the user to the "Upgrading from a previous version" section in `SKILL_DIR/references/setup-guides.md` — they need to add new scopes (`cardkit:card:write`, `cardkit:card:read`, `im:message:update`, `im:message.reactions:read`, `im:message.reactions:write_only`), add the `card.action.trigger` callback, and re-publish the app. The upgrade requires two publish cycles because adding the callback needs an active WebSocket connection (bridge must be running).
 
 ## Notes
 
